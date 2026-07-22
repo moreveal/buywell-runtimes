@@ -61,6 +61,7 @@ def build(directory: Path, output_directory: Path) -> Path:
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for archive_path, source in sorted(entries):
             info = zipfile.ZipInfo(archive_path, FIXED_TIME)
+            info.create_system = 3
             info.compress_type = zipfile.ZIP_DEFLATED
             mode = 0o100755 if archive_path.endswith(".sh") else 0o100644
             info.external_attr = mode << 16
@@ -76,10 +77,14 @@ def main() -> int:
     parser.add_argument(
         "packages",
         nargs="*",
-        choices=PACKAGE_DIRECTORIES,
-        default=None,
+        metavar="PACKAGE",
     )
     arguments = parser.parse_args()
+    unknown = sorted(set(arguments.packages) - set(PACKAGE_DIRECTORIES))
+    if unknown:
+        parser.error(
+            f"unknown package {', '.join(unknown)}; choose from {', '.join(PACKAGE_DIRECTORIES)}"
+        )
     for name in arguments.packages or PACKAGE_DIRECTORIES:
         output = build(ROOT / name, arguments.output.resolve())
         digest = hashlib.sha256(output.read_bytes()).hexdigest()

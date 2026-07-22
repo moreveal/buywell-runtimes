@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import logging
@@ -16,7 +17,7 @@ import urllib.request
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 try:
     import websocket
@@ -241,10 +242,18 @@ class State:
                 """
             )
 
-    def connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
         database = sqlite3.connect(self.path, timeout=30)
-        database.execute("PRAGMA busy_timeout=30000")
-        return database
+        try:
+            database.execute("PRAGMA busy_timeout=30000")
+            yield database
+            database.commit()
+        except Exception:
+            database.rollback()
+            raise
+        finally:
+            database.close()
 
     def get_setting(self, key: str) -> str | None:
         with self.connect() as database:
