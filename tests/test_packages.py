@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+from io import BytesIO
 from pathlib import Path
 
 
@@ -24,9 +25,16 @@ class PackageTests(unittest.TestCase):
             directory = ROOT / name
             manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
             for relative in build_packages._referenced_files(manifest):
+                if name in build_packages.RUNTIME_BUNDLES and relative == manifest["package"]["artifact"]["path"]:
+                    continue
                 self.assertTrue((directory / relative).is_file(), f"{name}: {relative}")
-            runtime_path = directory / manifest["package"]["artifact"]["path"]
-            runtime_text = runtime_path.read_text(encoding="utf-8")
+            artifact_path = manifest["package"]["artifact"]["path"]
+            if name == "ggsel":
+                runtime_text = (directory / "runtime" / "ggsel_runtime.py").read_text(
+                    encoding="utf-8"
+                )
+            else:
+                runtime_text = (directory / artifact_path).read_text(encoding="utf-8")
             self.assertIn(
                 f'MODULE_VERSION = "{manifest["module"]["version"]}"'
                 if name == "ggsel"
@@ -44,11 +52,20 @@ class PackageTests(unittest.TestCase):
             )
             with zipfile.ZipFile(first_output) as archive:
                 names = archive.namelist()
+                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.0.1.zip")
             self.assertIn("manifest.json", names)
-            self.assertIn("runtime/ggsel_runtime.py", names)
-            self.assertIn("config.example.json", names)
-            self.assertIn("install.bat", names)
-            self.assertIn("install.sh", names)
+            self.assertIn("runtime/ggsel-seller-runtime-1.0.1.zip", names)
+            self.assertNotIn("runtime/ggsel_runtime.py", names)
+            self.assertNotIn("install.bat", names)
+            with zipfile.ZipFile(BytesIO(runtime_archive)) as runtime:
+                runtime_names = runtime.namelist()
+                self.assertEqual(
+                    runtime_names,
+                    sorted(build_packages.RUNTIME_BUNDLES["ggsel"]),
+                )
+                self.assertIn(b'MODULE_VERSION = "1.0.1"', runtime.read("ggsel_runtime.py"))
+                self.assertTrue(runtime.getinfo("install.sh").external_attr >> 16 & 0o111)
+                self.assertTrue(runtime.getinfo("run.sh").external_attr >> 16 & 0o111)
 
 
 if __name__ == "__main__":

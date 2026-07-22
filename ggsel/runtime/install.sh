@@ -21,12 +21,12 @@ fi
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python configure.py
-.venv/bin/python runtime/ggsel_runtime.py --config config.json --check-config
-.venv/bin/python runtime/ggsel_runtime.py --config config.json --check-api
+.venv/bin/python ggsel_runtime.py --config config.json --check-config
+.venv/bin/python ggsel_runtime.py --config config.json --check-api
 
 printf "Start the runtime now? [Y/n]: "
 read -r answer
 case "$answer" in
   n|N|no|NO) echo "Run ./run.sh when ready." ;;
-  *) exec .venv/bin/python runtime/ggsel_runtime.py --config config.json ;;
+  *) exec .venv/bin/python ggsel_runtime.py --config config.json ;;
 esac

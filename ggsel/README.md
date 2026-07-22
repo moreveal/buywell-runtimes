@@ -16,7 +16,8 @@ The runtime:
 - stores cursors, deduplication records, pending events, and action results in
   SQLite.
 
-Run `install.bat` on Windows or `./install.sh` on Linux. The installer creates
+The installable runtime is built as one ZIP from the files in `runtime/`. After
+extracting it, run `install.bat` on Windows or `./install.sh` on Linux. The installer creates
 the virtual environment, installs dependencies, securely prompts for credentials,
 writes the configuration, validates it, and offers to start the runtime. See the
 [Russian installation guide](guides/install.ru.md) or

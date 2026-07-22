@@ -5,7 +5,7 @@
 - Windows 10/11 или современный Linux;
 - Python 3.11 или новее;
 - API-ключ продавца GGSel с доступом к V1 Orders и Chats;
-- установленный пакет GGSel Seller `1.0.0` в Buywell;
+- установленный пакет GGSel Seller `1.0.1` в Buywell;
 - ключ Buywell с разрешением `modules:connect`.
 
 Runtime устанавливается на компьютере или сервере, который постоянно включён.
@@ -13,7 +13,10 @@ Runtime устанавливается на компьютере или серв
 
 ## 1. Автоматическая установка
 
-Откройте терминал в каталоге `ggsel`.
+Скачайте runtime ZIP из установленного пакета GGSel Seller, распакуйте его в
+отдельный каталог и откройте терминал в этом каталоге. Архив уже содержит весь
+необходимый комплект: Python-код, конфигуратор, зависимости и скрипты для обеих
+систем.
 
 Windows:
 
@@ -69,7 +72,7 @@ Wants=network-online.target
 Type=simple
 User=buywell
 WorkingDirectory=/opt/buywell-runtimes/ggsel
-ExecStart=/opt/buywell-runtimes/ggsel/.venv/bin/python runtime/ggsel_runtime.py --config config.json
+ExecStart=/opt/buywell-runtimes/ggsel/.venv/bin/python ggsel_runtime.py --config config.json
 Restart=always
 RestartSec=5
 
@@ -91,7 +94,7 @@ sudo systemctl status buywell-ggsel
 
 1. Создайте задачу с запуском при входе или старте системы.
 2. В поле программы укажите полный путь к `.venv\Scripts\python.exe`.
-3. В аргументах укажите `runtime\ggsel_runtime.py --config config.json`.
+3. В аргументах укажите `ggsel_runtime.py --config config.json`.
 4. В рабочем каталоге укажите каталог `ggsel`.
 
 SQLite хранится по пути `database_path`. Сохраняйте этот файл при переносе или

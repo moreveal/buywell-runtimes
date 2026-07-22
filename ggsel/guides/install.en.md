@@ -5,7 +5,7 @@
 - Windows 10/11 or a current Linux distribution;
 - Python 3.11 or newer;
 - a GGSel seller API key with V1 Orders and Chats access;
-- GGSel Seller package `1.0.0` installed in Buywell;
+- GGSel Seller package `1.0.1` installed in Buywell;
 - a Buywell API key with the `modules:connect` permission.
 
 Run the process on a computer or server that remains online. No inbound port or
@@ -13,7 +13,9 @@ public IP address is required.
 
 ## 1. Automatic installation
 
-Open a terminal in the `ggsel` directory.
+Download the runtime ZIP from the installed GGSel Seller package, extract it
+into its own directory, and open a terminal there. The archive already contains
+the Python runtime, configurator, dependency list, and scripts for both systems.
 
 Windows:
 
@@ -68,7 +70,7 @@ Wants=network-online.target
 Type=simple
 User=buywell
 WorkingDirectory=/opt/buywell-runtimes/ggsel
-ExecStart=/opt/buywell-runtimes/ggsel/.venv/bin/python runtime/ggsel_runtime.py --config config.json
+ExecStart=/opt/buywell-runtimes/ggsel/.venv/bin/python ggsel_runtime.py --config config.json
 Restart=always
 RestartSec=5
 
@@ -90,7 +92,7 @@ Create a Windows Task Scheduler task:
 
 1. Start the task at sign-in or system startup.
 2. Set the program to the full path of `.venv\Scripts\python.exe`.
-3. Set arguments to `runtime\ggsel_runtime.py --config config.json`.
+3. Set arguments to `ggsel_runtime.py --config config.json`.
 4. Set the working directory to the `ggsel` directory.
 
 The SQLite file at `database_path` contains runtime cursors and pending work.

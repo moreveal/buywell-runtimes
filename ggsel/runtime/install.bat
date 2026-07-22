@@ -31,9 +31,9 @@ if errorlevel 1 exit /b 1
 if errorlevel 1 exit /b 1
 ".venv\Scripts\python.exe" configure.py
 if errorlevel 1 exit /b 1
-".venv\Scripts\python.exe" runtime\ggsel_runtime.py --config config.json --check-config
+".venv\Scripts\python.exe" ggsel_runtime.py --config config.json --check-config
 if errorlevel 1 exit /b 1
-".venv\Scripts\python.exe" runtime\ggsel_runtime.py --config config.json --check-api
+".venv\Scripts\python.exe" ggsel_runtime.py --config config.json --check-api
 if errorlevel 1 exit /b 1
 
 set /p START_NOW="Start the runtime now? [Y/n]: "

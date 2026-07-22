@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import zipfile
 from pathlib import Path
@@ -10,17 +11,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_DIRECTORIES = ("ggsel", "funpay-cardinal")
 FIXED_TIME = (2020, 1, 1, 0, 0, 0)
-PACKAGE_EXTRAS = {
+RUNTIME_BUNDLES = {
     "ggsel": [
         "config.example.json",
         "configure.py",
+        "ggsel_runtime.py",
         "install.bat",
         "install.sh",
         "requirements.txt",
         "run.bat",
         "run.sh",
     ],
-    "funpay-cardinal": [],
 }
 
 
@@ -38,6 +39,37 @@ def _referenced_files(manifest: dict) -> list[str]:
     return sorted(files)
 
 
+def _zip_info(path: str) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(path, FIXED_TIME)
+    info.create_system = 3
+    info.compress_type = zipfile.ZIP_DEFLATED
+    mode = 0o100755 if path.endswith(".sh") else 0o100644
+    info.external_attr = mode << 16
+    return info
+
+
+def _runtime_bundle(directory: Path) -> bytes | None:
+    files = RUNTIME_BUNDLES.get(directory.name)
+    if files is None:
+        return None
+    missing = [path for path in files if not (directory / "runtime" / path).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            f"{directory.name} runtime bundle is missing: {', '.join(missing)}"
+        )
+    output = io.BytesIO()
+    with zipfile.ZipFile(
+        output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
+        for path in sorted(files):
+            archive.writestr(
+                _zip_info(path),
+                (directory / "runtime" / path).read_bytes(),
+                compresslevel=9,
+            )
+    return output.getvalue()
+
+
 def build(directory: Path, output_directory: Path) -> Path:
     manifest_path = directory / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -46,13 +78,19 @@ def build(directory: Path, output_directory: Path) -> Path:
     output = output_directory / (
         f"{module['id']}-{module['version']}.buywell-module.zip"
     )
-    package_files = sorted(
-        set(_referenced_files(manifest)) | set(PACKAGE_EXTRAS[directory.name])
-    )
-    entries = [("manifest.json", manifest_path), *(
-        (path, directory / path) for path in package_files
-    )]
-    missing = [path for path, source in entries if not source.is_file()]
+    artifact_path = manifest["package"]["artifact"]["path"]
+    runtime_bundle = _runtime_bundle(directory)
+    package_files = _referenced_files(manifest)
+    entries: list[tuple[str, Path | bytes]] = [("manifest.json", manifest_path)]
+    for path in package_files:
+        entries.append(
+            (path, runtime_bundle)
+            if runtime_bundle is not None and path == artifact_path
+            else (path, directory / path)
+        )
+    missing = [
+        path for path, source in entries if isinstance(source, Path) and not source.is_file()
+    ]
     if missing:
         raise FileNotFoundError(
             f"{directory.name} references missing files: {', '.join(missing)}"
@@ -60,12 +98,8 @@ def build(directory: Path, output_directory: Path) -> Path:
 
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for archive_path, source in sorted(entries):
-            info = zipfile.ZipInfo(archive_path, FIXED_TIME)
-            info.create_system = 3
-            info.compress_type = zipfile.ZIP_DEFLATED
-            mode = 0o100755 if archive_path.endswith(".sh") else 0o100644
-            info.external_attr = mode << 16
-            archive.writestr(info, source.read_bytes(), compresslevel=9)
+            content = source.read_bytes() if isinstance(source, Path) else source
+            archive.writestr(_zip_info(archive_path), content, compresslevel=9)
     return output
 
 
