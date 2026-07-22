@@ -42,6 +42,44 @@ class PackageTests(unittest.TestCase):
                 runtime_text,
             )
 
+    def test_ggsel_events_offer_durable_buyer_input_collection(self):
+        manifest = json.loads((ROOT / "ggsel" / "manifest.json").read_text(encoding="utf-8"))
+        for event in manifest["events"]:
+            resolver = next(
+                item
+                for item in event.get("inputResolvers", [])
+                if item["id"] == "ggsel.seller.collect-input"
+            )
+            self.assertEqual(resolver["mode"], "deferred")
+            self.assertEqual(resolver["abstractionId"], "messaging.collect-input")
+            self.assertEqual(resolver["requiredContext"], [{"source": "scope", "path": "chatId"}])
+
+    def test_ggsel_1_1_keeps_the_core_public_contract_only(self):
+        manifest = json.loads((ROOT / "ggsel" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["module"]["version"], "1.1.0")
+        self.assertEqual(
+            [(event["type"], event["version"]) for event in manifest["events"]],
+            [
+                ("commerce.purchase.created", "1.0.0"),
+                ("messaging.message.received", "1.0.0"),
+            ],
+        )
+        self.assertEqual(
+            [(node["type"], node["version"]) for node in manifest["nodes"]],
+            [("ggsel.seller/send-message", "1.0.0")],
+        )
+        self.assertEqual(
+            manifest["nodes"][0]["inputSchema"]["properties"],
+            {"message": {"type": "string"}},
+        )
+
+    def test_ggsel_changelogs_date_every_release(self):
+        for locale in ("ru", "en"):
+            text = (ROOT / "ggsel" / "guides" / f"CHANGELOG.{locale}.md").read_text(encoding="utf-8")
+            headings = [line for line in text.splitlines() if line.startswith("## ")]
+            self.assertTrue(headings)
+            self.assertTrue(all(" — " in heading for heading in headings))
+
     def test_build_is_deterministic_and_contains_only_package_files(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             first_output = build_packages.build(ROOT / "ggsel", Path(first))
@@ -52,9 +90,9 @@ class PackageTests(unittest.TestCase):
             )
             with zipfile.ZipFile(first_output) as archive:
                 names = archive.namelist()
-                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.0.1.zip")
+                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.1.0.zip")
             self.assertIn("manifest.json", names)
-            self.assertIn("runtime/ggsel-seller-runtime-1.0.1.zip", names)
+            self.assertIn("runtime/ggsel-seller-runtime-1.1.0.zip", names)
             self.assertNotIn("runtime/ggsel_runtime.py", names)
             self.assertNotIn("install.bat", names)
             with zipfile.ZipFile(BytesIO(runtime_archive)) as runtime:
@@ -63,8 +101,9 @@ class PackageTests(unittest.TestCase):
                     runtime_names,
                     sorted(build_packages.RUNTIME_BUNDLES["ggsel"]),
                 )
-                self.assertIn(b'MODULE_VERSION = "1.0.1"', runtime.read("ggsel_runtime.py"))
+                self.assertIn(b'MODULE_VERSION = "1.1.0"', runtime.read("ggsel_runtime.py"))
                 self.assertTrue(runtime.getinfo("install.sh").external_attr >> 16 & 0o111)
+                self.assertTrue(runtime.getinfo("install-service.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("run.sh").external_attr >> 16 & 0o111)
 
 

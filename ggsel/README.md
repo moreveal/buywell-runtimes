@@ -13,13 +13,18 @@ The runtime:
 - detects new buyer messages for known and unread chats;
 - sends typed events to Buywell through an outbound WebSocket;
 - executes the in-context `Send message` action;
+- asks buyers for validated workflow input and resumes after their reply;
 - stores cursors, deduplication records, pending events, and action results in
   SQLite.
 
+The module intentionally exposes only those two events and the in-context message
+action. Purchase status changes, reviews, chat lookup, and file sending are not
+part of version 1.1.0.
+
 The installable runtime is built as one ZIP from the files in `runtime/`. After
 extracting it, run `install.bat` on Windows or `./install.sh` on Linux. The installer creates
-the virtual environment, installs dependencies, securely prompts for credentials,
-writes the configuration, validates it, and offers to start the runtime. See the
+the virtual environment, repairs missing pip when possible, securely prompts for credentials,
+checks both GGSel and Buywell connectivity, and can install an automatic background service. See the
 [Russian installation guide](guides/install.ru.md) or
 [English installation guide](guides/install.en.md) for service setup.
 
