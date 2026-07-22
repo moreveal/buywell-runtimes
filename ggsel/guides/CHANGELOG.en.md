@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 — July 22, 2026
+
+- HTTP transport logs no longer expose temporary GGSel authorization tokens in the console or system journal.
+
 ## 1.2.0 — July 22, 2026
 
 - Added a live product and parameter catalog for configuring workflows with stable IDs.

@@ -20,7 +20,7 @@ The runtime:
 
 The module intentionally exposes only those two events and the in-context message
 action. Purchase status changes, reviews, chat lookup, and file sending are not
-part of version 1.2.0.
+part of version 1.2.1.
 
 The installable runtime is built as one ZIP from the files in `runtime/`. After
 extracting it, run `install.bat` on Windows or `./install.sh` on Linux. The installer creates

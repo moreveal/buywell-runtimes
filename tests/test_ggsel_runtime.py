@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import sys
 import tempfile
 import types
@@ -78,6 +79,17 @@ def config(path: Path, *, emit_existing: bool = False):
 
 
 class ConfigTests(unittest.TestCase):
+    def test_transport_logging_never_emits_tokenized_urls(self):
+        loggers = [logging.getLogger("httpx"), logging.getLogger("httpcore")]
+        previous_levels = [logger.level for logger in loggers]
+        try:
+            with mock.patch.object(runtime.logging, "basicConfig"):
+                runtime._setup_logging("INFO")
+            self.assertEqual([logger.level for logger in loggers], [logging.WARNING, logging.WARNING])
+        finally:
+            for logger, previous_level in zip(loggers, previous_levels, strict=True):
+                logger.setLevel(previous_level)
+
     def test_valid_config_resolves_database_relative_to_config(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

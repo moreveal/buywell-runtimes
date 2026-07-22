@@ -28,7 +28,7 @@ except ImportError as error:  # pragma: no cover - exercised by the install guid
 
 
 MODULE_ID = "ggsel.seller"
-MODULE_VERSION = "1.2.0"
+MODULE_VERSION = "1.2.1"
 PROTOCOL_VERSION = "1.0.0"
 BINDING_CATALOG_PROTOCOL_VERSION = "1.0.0"
 PURCHASE_EVENT = "commerce.purchase.created"
@@ -1347,6 +1347,11 @@ def _setup_logging(level: str) -> None:
         level=getattr(logging, level),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    # httpx/httpcore include query strings in INFO messages. GGSel authenticates
+    # read requests with a temporary token in the query, so transport logs must
+    # never reach the runtime console or system journal.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def main(argv: list[str] | None = None) -> int:
