@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "ggsel.seller",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "displayName": "GGSel Seller",
     "description": "Передаёт покупки и сообщения GGSel в сценарии Buywell и отправляет ответы покупателям.",
     "publisher": "Buywell",
@@ -20,8 +20,8 @@
       "icon": "assets/ggsel-square-icon.png"
     },
     "artifact": {
-      "path": "runtime/ggsel-seller-runtime-1.2.1.zip",
-      "filename": "ggsel-seller-runtime-1.2.1.zip"
+      "path": "runtime/ggsel-seller-runtime-1.2.2.zip",
+      "filename": "ggsel-seller-runtime-1.2.2.zip"
     },
     "guides": {
       "installation": {

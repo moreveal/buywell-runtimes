@@ -28,7 +28,7 @@ except ImportError as error:  # pragma: no cover - exercised by the install guid
 
 
 MODULE_ID = "ggsel.seller"
-MODULE_VERSION = "1.2.1"
+MODULE_VERSION = "1.2.2"
 PROTOCOL_VERSION = "1.0.0"
 BINDING_CATALOG_PROTOCOL_VERSION = "1.0.0"
 PURCHASE_EVENT = "commerce.purchase.created"
@@ -466,6 +466,11 @@ class GGSelClient:
         self.config = config
         self.token: str | None = None
         self.token_lock = threading.Lock()
+        self.request_lock = threading.RLock()
+        self.catalog_cache_lock = threading.Lock()
+        self.last_request_at = 0.0
+        self.goods_cache: tuple[float, list[dict[str, Any]]] | None = None
+        self.product_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self.http = httpx.Client(timeout=httpx.Timeout(self.config.read_timeout_seconds,connect=self.config.connect_timeout_seconds),limits=httpx.Limits(max_connections=8,max_keepalive_connections=4))
 
     def _request(
@@ -479,6 +484,8 @@ class GGSelClient:
         headers: dict[str, str] | None = None,
         retry_auth: bool = True,
         retry_readonly: bool | None = None,
+        retry_attempts: int | None = None,
+        retry_base_seconds: float = 1.0,
     ) -> Any:
         query = dict(params or {})
         if authenticated:
@@ -489,30 +496,43 @@ class GGSelClient:
         request_headers = {"Accept": "application/json", **(headers or {})}
         safe_retry = method == "GET" if retry_readonly is None else retry_readonly
         response = None
-        attempts = 3 if safe_retry else 1
-        for attempt in range(attempts):
-            try:
-                response=self.http.request(method,url,params=query,json=body,headers=request_headers)
-            except (httpx.TimeoutException,httpx.NetworkError) as error:
-                if attempt+1<attempts:
-                    time.sleep(min(4,2**attempt));continue
-                raise ApiError("temporary_failure" if safe_retry else "outcome_unknown","GGSel request failed",retryable=safe_retry) from error
-            if response.status_code in {401,403} and authenticated and retry_auth:
-                self.token = None
-                self.login()
-                return self._request(
-                    method,
-                    path,
-                    params=params,
-                    body=body,
-                    authenticated=True,
-                    headers=headers,
-                    retry_auth=False,
-                    retry_readonly=retry_readonly,
-                )
-            if response.status_code in {408,425,429,500,502,503,504} and attempt+1<attempts:
-                delay=response.headers.get("retry-after");time.sleep(min(10,float(delay)) if delay and delay.isdigit() else min(4,2**attempt));continue
-            break
+        attempts = retry_attempts if retry_attempts is not None else 3 if safe_retry else 1
+        with self.request_lock:
+            for attempt in range(attempts):
+                spacing = 0.25 - (time.monotonic() - self.last_request_at)
+                if spacing > 0:
+                    time.sleep(spacing)
+                try:
+                    response=self.http.request(method,url,params=query,json=body,headers=request_headers)
+                    self.last_request_at = time.monotonic()
+                except (httpx.TimeoutException,httpx.NetworkError) as error:
+                    self.last_request_at = time.monotonic()
+                    if attempt+1<attempts:
+                        time.sleep(min(8,retry_base_seconds*(2**attempt)));continue
+                    raise ApiError("temporary_failure" if safe_retry else "outcome_unknown","GGSel request failed",retryable=safe_retry) from error
+                if response.status_code in {401,403} and authenticated and retry_auth:
+                    self.token = None
+                    self.login()
+                    return self._request(
+                        method,
+                        path,
+                        params=params,
+                        body=body,
+                        authenticated=True,
+                        headers=headers,
+                        retry_auth=False,
+                        retry_readonly=retry_readonly,
+                        retry_attempts=retry_attempts,
+                        retry_base_seconds=retry_base_seconds,
+                    )
+                if response.status_code in {408,425,429,500,502,503,504} and attempt+1<attempts:
+                    delay=response.headers.get("retry-after")
+                    try:
+                        wait_seconds=float(delay) if delay is not None else retry_base_seconds*(2**attempt)
+                    except ValueError:
+                        wait_seconds=retry_base_seconds*(2**attempt)
+                    time.sleep(min(6,max(0.25,wait_seconds)));continue
+                break
         assert response is not None
         if response.is_error:
             retryable=safe_retry and response.status_code in {408,425,429,500,502,503,504}
@@ -574,14 +594,30 @@ class GGSelClient:
         return data
 
     def goods(self) -> list[dict[str,Any]]:
-        data=self._request("POST","seller-goods",body={"seller_id":self.config.seller_id},authenticated=True,retry_readonly=True)
-        candidates=data if isinstance(data,list) else next((data.get(key) for key in ("goods","products","items","rows") if isinstance(data.get(key),list)),[]) if isinstance(data,dict) else []
-        return [item for item in candidates if isinstance(item,dict)]
+        with self.catalog_cache_lock:
+            now=time.monotonic()
+            if self.goods_cache and self.goods_cache[0]>now:return [dict(item) for item in self.goods_cache[1]]
+            stale=self.goods_cache[1] if self.goods_cache else None
+            try:data=self._request("POST","seller-goods",body={"seller_id":self.config.seller_id},authenticated=True,retry_readonly=True,retry_attempts=4,retry_base_seconds=2)
+            except ApiError as error:
+                if stale is not None and error.retryable:return [dict(item) for item in stale]
+                raise
+            candidates=data if isinstance(data,list) else next((data.get(key) for key in ("goods","products","items","rows") if isinstance(data.get(key),list)),[]) if isinstance(data,dict) else []
+            goods=[item for item in candidates if isinstance(item,dict)]
+            self.goods_cache=(now+120,goods)
+            return [dict(item) for item in goods]
 
     def product_data(self,product_id:str)->dict[str,Any]:
-        data=self._request("GET",f"products/{product_id}/data",authenticated=True)
-        if not isinstance(data,dict):raise ApiError("invalid_response","Could not read product options",retryable=True)
-        return data
+        with self.catalog_cache_lock:
+            now=time.monotonic();cached=self.product_cache.get(product_id)
+            if cached and cached[0]>now:return dict(cached[1])
+            try:data=self._request("GET",f"products/{product_id}/data",authenticated=True,retry_attempts=4,retry_base_seconds=2)
+            except ApiError as error:
+                if cached and error.retryable:return dict(cached[1])
+                raise
+            if not isinstance(data,dict):raise ApiError("invalid_response","Could not read product options",retryable=True)
+            self.product_cache[product_id]=(now+120,data)
+            return dict(data)
 
     def chats_with_new_messages(self) -> list[int]:
         data = self._request(

@@ -131,6 +131,39 @@ class ClientRetryTests(unittest.TestCase):
         self.assertEqual(failure.exception.code, "outcome_unknown")
         self.assertEqual(client.http.request.call_count, 1)
 
+    def test_product_catalog_waits_out_rate_limits_and_reuses_the_result(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("GET", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.side_effect = [
+            runtime.httpx.Response(429, request=request),
+            runtime.httpx.Response(429, request=request),
+            runtime.httpx.Response(200, json={"product": {"id": 42}}, request=request),
+        ]
+        with mock.patch.object(runtime.time, "sleep") as sleep:
+            first = client.product_data("42")
+            second = client.product_data("42")
+        self.assertEqual(first, {"product": {"id": 42}})
+        self.assertEqual(second, first)
+        self.assertEqual(client.http.request.call_count, 3)
+        self.assertGreaterEqual(sleep.call_count, 2)
+
+    def test_goods_catalog_reuses_a_recent_success(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("POST", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.return_value = runtime.httpx.Response(
+            200,
+            json={"goods": [{"id": 42, "name": "Discord"}]},
+            request=request,
+        )
+        with mock.patch.object(runtime.time, "sleep"):
+            self.assertEqual(client.goods(), [{"id": 42, "name": "Discord"}])
+            self.assertEqual(client.goods(), [{"id": 42, "name": "Discord"}])
+        self.assertEqual(client.http.request.call_count, 1)
+
     def test_remote_plain_http_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "config.json"

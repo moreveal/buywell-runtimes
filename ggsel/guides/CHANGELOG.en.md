@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2 — July 22, 2026
+
+- The product catalog retries temporarily limited requests with increasing delays and reuses recently loaded products and parameters.
+- Purchase polling and catalog loading no longer send competing requests to GGSel.
+
 ## 1.2.1 — July 22, 2026
 
 - HTTP transport logs no longer expose temporary GGSel authorization tokens in the console or system journal.

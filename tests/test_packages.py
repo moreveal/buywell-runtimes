@@ -56,7 +56,7 @@ class PackageTests(unittest.TestCase):
 
     def test_ggsel_1_2_adds_stable_product_catalog(self):
         manifest = json.loads((ROOT / "ggsel" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["module"]["version"], "1.2.1")
+        self.assertEqual(manifest["module"]["version"], "1.2.2")
         self.assertEqual(
             [(event["type"], event["version"]) for event in manifest["events"]],
             [
@@ -100,9 +100,9 @@ class PackageTests(unittest.TestCase):
             )
             with zipfile.ZipFile(first_output) as archive:
                 names = archive.namelist()
-                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.2.1.zip")
+                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.2.2.zip")
             self.assertIn("manifest.json", names)
-            self.assertIn("runtime/ggsel-seller-runtime-1.2.1.zip", names)
+            self.assertIn("runtime/ggsel-seller-runtime-1.2.2.zip", names)
             self.assertNotIn("runtime/ggsel_runtime.py", names)
             self.assertNotIn("install.bat", names)
             with zipfile.ZipFile(BytesIO(runtime_archive)) as runtime:
@@ -111,7 +111,7 @@ class PackageTests(unittest.TestCase):
                     runtime_names,
                     sorted(build_packages.RUNTIME_BUNDLES["ggsel"]),
                 )
-                self.assertIn(b'MODULE_VERSION = "1.2.1"', runtime.read("ggsel_runtime.py"))
+                self.assertIn(b'MODULE_VERSION = "1.2.2"', runtime.read("ggsel_runtime.py"))
                 self.assertTrue(runtime.getinfo("install.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("install-service.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("run.sh").external_attr >> 16 & 0o111)
