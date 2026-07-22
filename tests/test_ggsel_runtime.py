@@ -157,6 +157,218 @@ class ApiCheckTests(unittest.TestCase):
             result = runtime.main(["--config", "config.json", "--check-api"])
         self.assertEqual(result, 3)
 
+
+class BuywellProtocolTests(unittest.TestCase):
+    def tearDown(self):
+        runtime.STOP.clear()
+        runtime.READY.clear()
+
+    def test_connection_check_completes_authenticated_handshake(self):
+        class Channel:
+            def __init__(self):
+                self.sent = []
+                self.responses = [
+                    {
+                        "type": "capture-spec.replace",
+                        "specification": {"revision": 3, "digest": "a" * 64},
+                    },
+                    {"type": "ready"},
+                ]
+                self.closed = False
+
+            def send(self, value):
+                self.sent.append(json.loads(value))
+
+            def recv(self):
+                return json.dumps(self.responses.pop(0))
+
+            def close(self):
+                self.closed = True
+
+        channel = Channel()
+        with (
+            mock.patch.object(runtime, "_buywell_request") as request,
+            mock.patch.object(runtime.websocket, "create_connection", return_value=channel),
+        ):
+            runtime._check_buywell_connection(config(Path("state.sqlite3")))
+
+        request.assert_called_once_with(
+            mock.ANY,
+            "/v1/module-runtime/connect",
+            {"moduleId": runtime.MODULE_ID, "moduleVersion": runtime.MODULE_VERSION},
+        )
+        self.assertEqual(channel.sent[0]["type"], "authenticate")
+        self.assertEqual(channel.sent[1]["type"], "capture-spec.applied")
+        self.assertTrue(channel.closed)
+
+    def test_socket_delivers_event_action_and_durable_input_cycle(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state = runtime.State(Path(temporary) / "state.sqlite3")
+            state.enqueue(
+                "ggsel:7:purchase:100",
+                {
+                    "moduleId": runtime.MODULE_ID,
+                    "moduleVersion": runtime.MODULE_VERSION,
+                    "eventType": runtime.PURCHASE_EVENT,
+                    "eventVersion": runtime.EVENT_VERSION,
+                    "eventId": "ggsel:7:purchase:100",
+                    "payload": {"invoiceId": "100", "status": "1"},
+                    "scope": {"invoiceId": "100", "chatId": 100, "sellerId": 7},
+                },
+            )
+
+            class Client:
+                def __init__(self):
+                    self.messages = []
+
+                def send_message(self, chat_id, message):
+                    self.messages.append((chat_id, message))
+                    if message == "Question":
+                        state.save_input_candidate("candidate-1", "correlation-1", "bad")
+                    elif message == "Try again":
+                        state.save_input_candidate("candidate-2", "correlation-1", "valid")
+
+            client = Client()
+
+            class Channel:
+                def __init__(self):
+                    self.stage = 0
+                    self.sent = []
+                    self.closed = False
+
+                def send(self, value):
+                    self.sent.append(json.loads(value))
+
+                def recv(self):
+                    self.stage += 1
+                    if self.stage == 1:
+                        return json.dumps(
+                            {
+                                "type": "capture-spec.replace",
+                                "specification": {
+                                    "revision": 1,
+                                    "digest": "b" * 64,
+                                    "subscriptions": [
+                                        {
+                                            "eventType": runtime.PURCHASE_EVENT,
+                                            "eventVersion": runtime.EVENT_VERSION,
+                                            "conditions": [
+                                                {
+                                                    "source": "scope",
+                                                    "path": "sellerId",
+                                                    "operator": "exists",
+                                                }
+                                            ],
+                                        }
+                                    ],
+                                },
+                            }
+                        )
+                    if self.stage == 2:
+                        return json.dumps({"type": "ready"})
+                    if self.stage == 3:
+                        batch = next(item for item in self.sent if item["type"] == "event.batch")
+                        return json.dumps(
+                            {
+                                "type": "event.batch.accepted",
+                                "batchId": batch["batchId"],
+                                "results": [
+                                    {"eventId": "ggsel:7:purchase:100", "accepted": True}
+                                ],
+                            }
+                        )
+                    if self.stage == 4:
+                        return json.dumps(
+                            {
+                                "type": "action.request",
+                                "job": {
+                                    "jobId": "action-1",
+                                    "leaseToken": "lease-action",
+                                    "idempotencyKey": "execution:node",
+                                    "nodeType": runtime.SEND_MESSAGE_NODE,
+                                    "inputs": {"message": "Workflow message"},
+                                    "context": {"eventScope": {"chatId": 100}},
+                                },
+                            }
+                        )
+                    if self.stage == 5:
+                        return json.dumps(
+                            {
+                                "type": "input.request",
+                                "job": {"jobId": "input-1", "leaseToken": "lease-input"},
+                            }
+                        )
+                    if self.stage == 6:
+                        return json.dumps(
+                            {
+                                "type": "input.waiting.accepted",
+                                "accepted": True,
+                                "jobId": "input-1",
+                                "correlationToken": "correlation-1",
+                                "conversationKey": "100",
+                                "deadline": "2026-07-23T00:00:00Z",
+                                "prompt": "Question",
+                            }
+                        )
+                    if self.stage == 7:
+                        self.assert_candidate_sent("candidate-1")
+                        return json.dumps(
+                            {
+                                "type": "input.candidate.result",
+                                "accepted": True,
+                                "correlationToken": "correlation-1",
+                                "candidateId": "candidate-1",
+                                "outcome": "retry",
+                                "message": "Try again",
+                            }
+                        )
+                    self.assert_candidate_sent("candidate-2")
+                    runtime.STOP.set()
+                    return json.dumps(
+                        {
+                            "type": "input.candidate.result",
+                            "accepted": True,
+                            "correlationToken": "correlation-1",
+                            "candidateId": "candidate-2",
+                            "outcome": "resolved",
+                        }
+                    )
+
+                def assert_candidate_sent(self, candidate_id):
+                    assert any(
+                        item.get("type") == "input.candidate"
+                        and item.get("candidateId") == candidate_id
+                        for item in self.sent
+                    )
+
+                def settimeout(self, _timeout):
+                    pass
+
+                def close(self):
+                    self.closed = True
+
+            channel = Channel()
+            runtime.STOP.clear()
+            with (
+                mock.patch.object(runtime, "_buywell_request"),
+                mock.patch.object(runtime.websocket, "create_connection", return_value=channel),
+            ):
+                runtime._connect_socket(config(state.path), state, client)
+
+            self.assertEqual(state.outbox(), [])
+            self.assertIsNone(state.input_wait_for_conversation("100"))
+            self.assertEqual(state.input_candidates(), [])
+            self.assertEqual(
+                client.messages,
+                [(100, "Workflow message"), (100, "Question"), (100, "Try again")],
+            )
+            self.assertEqual(
+                [item["type"] for item in channel.sent if item["type"] in {"action.result", "input.waiting"}],
+                ["action.result", "input.waiting"],
+            )
+            self.assertTrue(channel.closed)
+
+
 class PollingTests(unittest.TestCase):
     def setUp(self):
         runtime.CAPTURE_SPEC = {
@@ -208,6 +420,55 @@ class PollingTests(unittest.TestCase):
             rows = state.outbox()
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0][1]["payload"]["text"], "buyer")
+
+    def test_waiting_buyer_reply_becomes_input_candidate_instead_of_event(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state = runtime.State(Path(temporary) / "state.sqlite3")
+            state.set_setting("messages_initialized", "1")
+            state.remember_chat(100, emit_existing=True)
+            state.save_input_wait("correlation-1", "100", "2026-07-23T00:00:00Z")
+            client = FakeClient()
+            client.message_rows[100] = [
+                {"id": 2, "message": "buyer reply", "seller": 0, "buyer": 1},
+            ]
+            runtime.Poller(config(state.path), state, client).poll_messages()
+            self.assertEqual(state.outbox(), [])
+            candidates = state.input_candidates()
+            self.assertEqual(len(candidates), 1)
+            self.assertEqual(candidates[0][0], "correlation-1")
+            self.assertEqual(candidates[0][3], "buyer reply")
+
+    def test_replacing_waits_removes_stale_candidates(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state = runtime.State(Path(temporary) / "state.sqlite3")
+            state.save_input_wait("old", "100", "2026-07-23T00:00:00Z")
+            state.save_input_candidate("candidate-1", "old", "reply")
+            state.replace_input_waits(
+                [{"correlationToken": "new", "conversationKey": "200", "deadline": "2026-07-24T00:00:00Z"}]
+            )
+            self.assertIsNone(state.input_wait_for_conversation("100"))
+            self.assertEqual(state.input_wait_for_conversation("200"), "new")
+            self.assertEqual(state.input_candidates(), [])
+
+    def test_wait_and_unsubmitted_reply_survive_state_reopen(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "state.sqlite3"
+            state = runtime.State(path)
+            state.save_input_wait("correlation-1", "100", "2026-07-23T00:00:00Z")
+            state.save_input_candidate("candidate-1", "correlation-1", "reply")
+
+            reopened = runtime.State(path)
+            self.assertEqual(reopened.input_wait_for_conversation("100"), "correlation-1")
+            self.assertEqual(reopened.input_candidates()[0][3], "reply")
+
+    def test_unacknowledged_event_survives_state_reopen(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "state.sqlite3"
+            state = runtime.State(path)
+            state.enqueue("event-1", {"eventId": "event-1", "eventType": runtime.PURCHASE_EVENT})
+
+            reopened = runtime.State(path)
+            self.assertEqual(reopened.outbox()[0][1]["eventId"], "event-1")
 
 
 class ActionTests(unittest.TestCase):

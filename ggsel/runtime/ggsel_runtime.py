@@ -28,7 +28,7 @@ except ImportError as error:  # pragma: no cover - exercised by the install guid
 
 
 MODULE_ID = "ggsel.seller"
-MODULE_VERSION = "1.0.1"
+MODULE_VERSION = "1.1.0"
 PROTOCOL_VERSION = "1.0.0"
 PURCHASE_EVENT = "commerce.purchase.created"
 MESSAGE_EVENT = "messaging.message.received"
@@ -239,6 +239,17 @@ class State:
                     first_seen_at REAL NOT NULL,
                     PRIMARY KEY (chat_id, message_id)
                 );
+                CREATE TABLE IF NOT EXISTS input_waits (
+                    correlation_token TEXT PRIMARY KEY,
+                    conversation_key TEXT NOT NULL UNIQUE,
+                    deadline TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS input_candidates (
+                    candidate_id TEXT PRIMARY KEY,
+                    correlation_token TEXT NOT NULL,
+                    observed_at TEXT NOT NULL,
+                    value TEXT NOT NULL
+                );
                 """
             )
 
@@ -356,6 +367,88 @@ class State:
                 "ON CONFLICT(idempotency_key) DO UPDATE SET "
                 "terminal=excluded.terminal,result=excluded.result,updated_at=excluded.updated_at",
                 (key, int(terminal), json.dumps(result, ensure_ascii=False), time.time()),
+            )
+
+    def save_input_wait(
+        self, correlation_token: str, conversation_key: str, deadline: str
+    ) -> None:
+        with self.connect() as database:
+            database.execute(
+                "INSERT INTO input_waits(correlation_token,conversation_key,deadline) VALUES(?,?,?) "
+                "ON CONFLICT(conversation_key) DO UPDATE SET "
+                "correlation_token=excluded.correlation_token,deadline=excluded.deadline",
+                (correlation_token, conversation_key, deadline),
+            )
+
+    def replace_input_waits(self, waits: Iterable[dict[str, Any]]) -> None:
+        with self.connect() as database:
+            database.execute("DELETE FROM input_waits")
+            database.executemany(
+                "INSERT INTO input_waits(correlation_token,conversation_key,deadline) VALUES(?,?,?)",
+                (
+                    (
+                        str(wait["correlationToken"]),
+                        str(wait["conversationKey"]),
+                        str(wait["deadline"]),
+                    )
+                    for wait in waits
+                ),
+            )
+            database.execute(
+                "DELETE FROM input_candidates WHERE correlation_token NOT IN "
+                "(SELECT correlation_token FROM input_waits)"
+            )
+
+    def input_wait_for_conversation(self, conversation_key: str) -> str | None:
+        with self.connect() as database:
+            row = database.execute(
+                "SELECT correlation_token FROM input_waits WHERE conversation_key=?",
+                (conversation_key,),
+            ).fetchone()
+        return str(row[0]) if row else None
+
+    def conversation_for_input_wait(self, correlation_token: str) -> str | None:
+        with self.connect() as database:
+            row = database.execute(
+                "SELECT conversation_key FROM input_waits WHERE correlation_token=?",
+                (correlation_token,),
+            ).fetchone()
+        return str(row[0]) if row else None
+
+    def save_input_candidate(
+        self, candidate_id: str, correlation_token: str, value: str
+    ) -> None:
+        observed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        with self.connect() as database:
+            database.execute(
+                "INSERT OR IGNORE INTO input_candidates"
+                "(candidate_id,correlation_token,observed_at,value) VALUES(?,?,?,?)",
+                (candidate_id, correlation_token, observed_at, value),
+            )
+
+    def input_candidates(self) -> list[tuple[str, str, str, str]]:
+        with self.connect() as database:
+            rows = database.execute(
+                "SELECT correlation_token,candidate_id,observed_at,value "
+                "FROM input_candidates ORDER BY rowid"
+            ).fetchall()
+        return [(str(row[0]), str(row[1]), str(row[2]), str(row[3])) for row in rows]
+
+    def delete_input_candidate(self, candidate_id: str) -> None:
+        with self.connect() as database:
+            database.execute(
+                "DELETE FROM input_candidates WHERE candidate_id=?", (candidate_id,)
+            )
+
+    def complete_input_wait(self, correlation_token: str) -> None:
+        with self.connect() as database:
+            database.execute(
+                "DELETE FROM input_candidates WHERE correlation_token=?",
+                (correlation_token,),
+            )
+            database.execute(
+                "DELETE FROM input_waits WHERE correlation_token=?",
+                (correlation_token,),
             )
 
 
@@ -756,6 +849,15 @@ class Poller:
                 text = str(message.get("message", "")).strip()
                 if not text and not message.get("is_file"):
                     continue
+                correlation_token = self.state.input_wait_for_conversation(str(chat_id))
+                if correlation_token:
+                    if text:
+                        self.state.save_input_candidate(
+                            f"ggsel:{self.config.seller_id}:chat:{chat_id}:message:{message_id}",
+                            correlation_token,
+                            text,
+                        )
+                    continue
                 payload = _clean(
                     {
                         "messageId": str(message_id),
@@ -812,6 +914,51 @@ def _socket_url(config: Config) -> str:
     return urllib.parse.urlunsplit(
         (scheme, host, parsed.path.rstrip("/") + "/v1/module-runtime/socket", "", "")
     )
+
+
+def _check_buywell_connection(config: Config) -> None:
+    _buywell_request(
+        config,
+        "/v1/module-runtime/connect",
+        {"moduleId": MODULE_ID, "moduleVersion": MODULE_VERSION},
+    )
+    channel = websocket.create_connection(_socket_url(config), timeout=10)
+    try:
+        channel.send(
+            json.dumps(
+                {
+                    "type": "authenticate",
+                    "token": config.connection_token,
+                    "moduleId": MODULE_ID,
+                    "moduleVersion": MODULE_VERSION,
+                }
+            )
+        )
+        for _ in range(20):
+            message = json.loads(channel.recv())
+            message_type = message.get("type")
+            if message_type == "capture-spec.replace":
+                specification = message["specification"]
+                channel.send(
+                    json.dumps(
+                        {
+                            "type": "capture-spec.applied",
+                            "revision": specification["revision"],
+                            "digest": specification["digest"],
+                        }
+                    )
+                )
+            elif message_type == "capture-spec.applied.accepted" and not message.get(
+                "accepted"
+            ):
+                raise RuntimeError("Buywell rejected the capture specification")
+            elif message_type == "ready":
+                return
+            elif message_type == "error":
+                raise RuntimeError(str(message.get("code", "Buywell connection failed")))
+        raise RuntimeError("Buywell did not confirm runtime readiness")
+    finally:
+        channel.close()
 
 
 def _apply_capture_spec(state: State, specification: dict[str, Any]) -> None:
@@ -947,6 +1094,8 @@ def _connect_socket(config: Config, state: State, client: GGSelClient) -> None:
         channel.settimeout(1)
         heartbeat_at = 0.0
         pending_batch: tuple[str, list[tuple[int, str]]] | None = None
+        pending_input_jobs: dict[str, dict[str, Any]] = {}
+        submitted_candidates: set[str] = set()
         while not STOP.is_set():
             now = time.time()
             if now >= heartbeat_at:
@@ -983,6 +1132,21 @@ def _connect_socket(config: Config, state: State, client: GGSelClient) -> None:
                             ensure_ascii=False,
                         )
                     )
+            for correlation_token, candidate_id, observed_at, value in state.input_candidates():
+                if candidate_id not in submitted_candidates:
+                    channel.send(
+                        json.dumps(
+                            {
+                                "type": "input.candidate",
+                                "correlationToken": correlation_token,
+                                "candidateId": candidate_id,
+                                "observedAt": observed_at,
+                                "value": value,
+                            },
+                            ensure_ascii=False,
+                        )
+                    )
+                    submitted_candidates.add(candidate_id)
             try:
                 message = json.loads(channel.recv())
             except websocket.WebSocketTimeoutException:
@@ -1026,6 +1190,47 @@ def _connect_socket(config: Config, state: State, client: GGSelClient) -> None:
                         ensure_ascii=False,
                     )
                 )
+            elif message_type == "input.request":
+                job = message["job"]
+                pending_input_jobs[str(job["jobId"])] = job
+                channel.send(
+                    json.dumps(
+                        {
+                            "type": "input.waiting",
+                            "jobId": job["jobId"],
+                            "leaseToken": job["leaseToken"],
+                        }
+                    )
+                )
+            elif message_type == "input.waiting.accepted" and message.get("accepted"):
+                job = pending_input_jobs.pop(str(message.get("jobId")), None)
+                if job:
+                    conversation_key = str(message["conversationKey"])
+                    state.save_input_wait(
+                        str(message["correlationToken"]),
+                        conversation_key,
+                        str(message["deadline"]),
+                    )
+                    prompt = str(message.get("prompt", "")).strip()
+                    if prompt:
+                        client.send_message(int(conversation_key), prompt)
+            elif message_type == "input.waits.replace":
+                state.replace_input_waits(message.get("waiting", []))
+            elif message_type == "input.candidate.result":
+                correlation_token = str(message.get("correlationToken", ""))
+                candidate_id = str(message.get("candidateId", ""))
+                submitted_candidates.discard(candidate_id)
+                outcome = message.get("outcome")
+                if outcome == "retry":
+                    state.delete_input_candidate(candidate_id)
+                    invalid_message = str(message.get("message", "")).strip()
+                    conversation_key = state.conversation_for_input_wait(correlation_token)
+                    if conversation_key and invalid_message:
+                        client.send_message(int(conversation_key), invalid_message)
+                elif outcome in {"resolved", "failed"}:
+                    state.complete_input_wait(correlation_token)
+                elif not message.get("accepted"):
+                    state.delete_input_candidate(candidate_id)
             elif message_type == "capture-spec.replace":
                 specification = message["specification"]
                 _apply_capture_spec(state, specification)
@@ -1085,6 +1290,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Verify read access to GGSel API V1 and exit",
     )
+    parser.add_argument(
+        "--check-buywell",
+        action="store_true",
+        help="Verify the authenticated Buywell WebSocket handshake and exit",
+    )
     arguments = parser.parse_args(argv)
     try:
         config = Config.load(arguments.config.resolve())
@@ -1111,6 +1321,15 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 3
         logger.info("GGSel API V1 orders and chats access is available")
+        return 0
+
+    if arguments.check_buywell:
+        try:
+            _check_buywell_connection(config)
+        except Exception as error:
+            logger.error("Buywell connection check failed: %s", error)
+            return 4
+        logger.info("Buywell accepted %s@%s and confirmed runtime readiness", MODULE_ID, MODULE_VERSION)
         return 0
 
     state = State(config.database_path)

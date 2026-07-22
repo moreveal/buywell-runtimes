@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "ggsel.seller",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "displayName": "GGSel Seller",
     "description": "Передаёт покупки и сообщения GGSel в сценарии Buywell и отправляет ответы покупателям.",
     "publisher": "Buywell",
@@ -20,8 +20,8 @@
       "icon": "assets/ggsel-square-icon.png"
     },
     "artifact": {
-      "path": "runtime/ggsel-seller-runtime-1.0.1.zip",
-      "filename": "ggsel-seller-runtime-1.0.1.zip"
+      "path": "runtime/ggsel-seller-runtime-1.1.0.zip",
+      "filename": "ggsel-seller-runtime-1.1.0.zip"
     },
     "guides": {
       "installation": {
@@ -346,6 +346,71 @@
           "availability": "when-present"
         }
       ],
+      "inputResolvers": [
+        {
+          "id": "ggsel.seller.collect-input",
+          "version": "1.0.0",
+          "abstractionId": "messaging.collect-input",
+          "abstractionVersion": "1.1.0",
+          "displayName": "Ask buyer",
+          "description": "Asks the buyer for a value and lets Buywell validate every response.",
+          "localization": {
+            "ru": {
+              "displayName": "Спросить покупателя",
+              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
+            },
+            "en": {
+              "displayName": "Ask buyer",
+              "description": "Asks in the current chat and sends responses to Buywell for validation."
+            }
+          },
+          "outputSchema": {
+            "type": "unknown"
+          },
+          "parameterSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "invalidResponse": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "validator": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "timeoutSeconds": {
+                "type": "integer"
+              },
+              "maxInvalidAttempts": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "prompt",
+              "invalidResponse",
+              "validator"
+            ],
+            "additionalProperties": false
+          },
+          "mode": "deferred",
+          "sensitive": true,
+          "requiredContext": [
+            {
+              "source": "scope",
+              "path": "chatId"
+            }
+          ],
+          "ui": {
+            "category": "Messaging",
+            "order": 10,
+            "recommended": true
+          }
+        }
+      ],
       "identityFields": [
         "invoiceId"
       ],
@@ -514,6 +579,71 @@
           },
           "order": 30,
           "availability": "when-present"
+        }
+      ],
+      "inputResolvers": [
+        {
+          "id": "ggsel.seller.collect-input",
+          "version": "1.0.0",
+          "abstractionId": "messaging.collect-input",
+          "abstractionVersion": "1.1.0",
+          "displayName": "Ask buyer",
+          "description": "Asks the buyer for a value and lets Buywell validate every response.",
+          "localization": {
+            "ru": {
+              "displayName": "Спросить покупателя",
+              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
+            },
+            "en": {
+              "displayName": "Ask buyer",
+              "description": "Asks in the current chat and sends responses to Buywell for validation."
+            }
+          },
+          "outputSchema": {
+            "type": "unknown"
+          },
+          "parameterSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "invalidResponse": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "validator": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "timeoutSeconds": {
+                "type": "integer"
+              },
+              "maxInvalidAttempts": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "prompt",
+              "invalidResponse",
+              "validator"
+            ],
+            "additionalProperties": false
+          },
+          "mode": "deferred",
+          "sensitive": true,
+          "requiredContext": [
+            {
+              "source": "scope",
+              "path": "chatId"
+            }
+          ],
+          "ui": {
+            "category": "Messaging",
+            "order": 10,
+            "recommended": true
+          }
         }
       ],
       "identityFields": [

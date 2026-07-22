@@ -1,99 +1,54 @@
-# Install the GGSel Seller runtime
+# Install GGSel Seller
 
-## Requirements
+You need Python 3.11+, a GGSel seller API key with Orders and Chats V1 access, and a Buywell connection key. No public IP or inbound port is required.
 
-- Windows 10/11 or a current Linux distribution;
-- Python 3.11 or newer;
-- a GGSel seller API key with V1 Orders and Chats access;
-- GGSel Seller package `1.0.1` installed in Buywell;
-- a Buywell API key with the `modules:connect` permission.
+## 1. Download and extract
 
-Run the process on a computer or server that remains online. No inbound port or
-public IP address is required.
+Download the runtime ZIP from the installed GGSel Seller `1.1.0` module in Buywell and extract it to a permanent folder. Avoid moving the folder after setup.
 
-## 1. Automatic installation
+## 2. Run the installer
 
-Download the runtime ZIP from the installed GGSel Seller package, extract it
-into its own directory, and open a terminal there. The archive already contains
-the Python runtime, configurator, dependency list, and scripts for both systems.
+On Windows, double-click `install.bat`.
 
-Windows:
-
-```bat
-install.bat
-```
-
-Linux:
+On Linux:
 
 ```bash
-chmod +x install.sh run.sh
+chmod +x install.sh
 ./install.sh
 ```
 
-The installer creates `.venv`, installs dependencies, prompts for the Buywell
-key, seller ID, and GGSel API key, writes `config.json`, validates the
-configuration and read-only V1 purchase/chat access, and offers to start the
-runtime. Secret input is not displayed. A key restricted to the newer
-catalog-only V2 API cannot provide purchase and message events.
+The installer automatically:
 
-`config.json` contains secrets. Do not share or commit it.
+- finds Python and tries to restore a missing `pip` with `ensurepip`;
+- creates an isolated environment and installs dependencies;
+- asks for the Buywell key, seller ID, and GGSel API key;
+- checks purchase and chat access;
+- completes a real runtime handshake with Buywell;
+- offers to install and immediately start a background service for the current user.
 
-## 2. Later starts
+Linux uses systemd with the current user and folder. Windows creates a `Buywell GGSel Runtime` task that starts when the current user signs in.
 
-Windows:
-
-```bat
-run.bat
-```
+## 3. Check it
 
 Linux:
 
 ```bash
-./run.sh
-```
-
-After `Connected to Buywell` appears, enable the required event connections in
-Buywell. The first scan records currently visible purchases and messages without
-starting workflows for them.
-
-## 3. Keep it running on Linux
-
-Create `/etc/systemd/system/buywell-ggsel.service`:
-
-```ini
-[Unit]
-Description=Buywell GGSel runtime
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=buywell
-WorkingDirectory=/opt/buywell-runtimes/ggsel
-ExecStart=/opt/buywell-runtimes/ggsel/.venv/bin/python ggsel_runtime.py --config config.json
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable it:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now buywell-ggsel
 sudo systemctl status buywell-ggsel
+sudo journalctl -u buywell-ggsel -f
 ```
 
-## 4. Keep it running on Windows
+On Windows, open Task Scheduler and find `Buywell GGSel Runtime`.
 
-Create a Windows Task Scheduler task:
+A successful installation confirms configuration, GGSel API, and Buywell
+connectivity. Running the installer again updates and restarts the existing service
+or task instead of creating a duplicate.
 
-1. Start the task at sign-in or system startup.
-2. Set the program to the full path of `.venv\Scripts\python.exe`.
-3. Set arguments to `ggsel_runtime.py --config config.json`.
-4. Set the working directory to the `ggsel` directory.
+Then enable the required event connections in Buywell. The first scan records existing purchases and messages without starting workflows for them.
 
-The SQLite file at `database_path` contains runtime cursors and pending work.
-Include it in backups and move it together with the runtime.
+## Manual start
+
+Use `run.bat` on Windows or `./run.sh` on Linux when automatic startup is not wanted.
+
+If Linux reports missing virtual-environment support, run `sudo apt install python3-venv` and retry. A GGSel `403` means the API key lacks Orders and Chats V1 access.
+
+`config.json` and the `state` folder contain secrets and runtime state. Keep them private and move them together with the runtime.
