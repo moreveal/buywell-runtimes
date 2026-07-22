@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.3 — July 22, 2026
+
+- A successful message send is no longer reported as failed when GGSel returns an empty body or plain text instead of JSON.
+- HTTP errors and explicit API failures still fail the action, and sending is not retried after an uncertain outcome.
+
 ## 1.2.2 — July 22, 2026
 
 - The product catalog retries temporarily limited requests with increasing delays and reuses recently loaded products and parameters.

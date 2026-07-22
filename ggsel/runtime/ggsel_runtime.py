@@ -28,7 +28,7 @@ except ImportError as error:  # pragma: no cover - exercised by the install guid
 
 
 MODULE_ID = "ggsel.seller"
-MODULE_VERSION = "1.2.2"
+MODULE_VERSION = "1.2.3"
 PROTOCOL_VERSION = "1.0.0"
 BINDING_CATALOG_PROTOCOL_VERSION = "1.0.0"
 PURCHASE_EVENT = "commerce.purchase.created"
@@ -486,6 +486,7 @@ class GGSelClient:
         retry_readonly: bool | None = None,
         retry_attempts: int | None = None,
         retry_base_seconds: float = 1.0,
+        allow_non_json_success: bool = False,
     ) -> Any:
         query = dict(params or {})
         if authenticated:
@@ -540,6 +541,8 @@ class GGSelClient:
         try:
             return response.json()
         except ValueError as error:
+            if allow_non_json_success:
+                return None
             raise ApiError(
                 "invalid_response", "GGSel returned a non-JSON response", retryable=False
             ) from error
@@ -667,8 +670,9 @@ class GGSelClient:
             body={"message": cleaned},
             authenticated=True,
             retry_readonly=False,
+            allow_non_json_success=True,
         )
-        if not isinstance(data, dict) or data.get("retval") != 0:
+        if isinstance(data, dict) and data.get("retval") not in {None, 0}:
             raise ApiError("outcome_unknown", "GGSel did not confirm delivery", retryable=False)
 
 

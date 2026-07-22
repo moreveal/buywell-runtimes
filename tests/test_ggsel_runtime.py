@@ -131,6 +131,46 @@ class ClientRetryTests(unittest.TestCase):
         self.assertEqual(failure.exception.code, "outcome_unknown")
         self.assertEqual(client.http.request.call_count, 1)
 
+    def test_message_send_accepts_successful_empty_response(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("POST", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.return_value = runtime.httpx.Response(200, content=b"", request=request)
+        client.send_message(42, "Hello")
+        self.assertEqual(client.http.request.call_count, 1)
+
+    def test_message_send_accepts_successful_plain_text_response(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("POST", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.return_value = runtime.httpx.Response(200, content=b"OK", request=request)
+        client.send_message(42, "Hello")
+        self.assertEqual(client.http.request.call_count, 1)
+
+    def test_message_send_still_rejects_http_failure_without_retry(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("POST", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.return_value = runtime.httpx.Response(500, request=request)
+        with self.assertRaises(runtime.ApiError) as failure:
+            client.send_message(42, "Hello")
+        self.assertEqual(failure.exception.code, "http_error")
+        self.assertEqual(client.http.request.call_count, 1)
+
+    def test_message_send_still_rejects_explicit_api_failure(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("POST", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.return_value = runtime.httpx.Response(200, json={"retval": 1}, request=request)
+        with self.assertRaises(runtime.ApiError) as failure:
+            client.send_message(42, "Hello")
+        self.assertEqual(failure.exception.code, "outcome_unknown")
+        self.assertEqual(client.http.request.call_count, 1)
+
     def test_product_catalog_waits_out_rate_limits_and_reuses_the_result(self):
         client = runtime.GGSelClient(config(Path("state.sqlite3")))
         client.token = "token"
