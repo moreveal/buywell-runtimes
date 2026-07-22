@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "ggsel.seller",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "displayName": "GGSel Seller",
     "description": "Передаёт покупки и сообщения GGSel в сценарии Buywell и отправляет ответы покупателям.",
     "publisher": "Buywell",
@@ -20,8 +20,8 @@
       "icon": "assets/ggsel-square-icon.png"
     },
     "artifact": {
-      "path": "runtime/ggsel-seller-runtime-1.1.0.zip",
-      "filename": "ggsel-seller-runtime-1.1.0.zip"
+      "path": "runtime/ggsel-seller-runtime-1.2.0.zip",
+      "filename": "ggsel-seller-runtime-1.2.0.zip"
     },
     "guides": {
       "installation": {
@@ -50,7 +50,7 @@
   "events": [
     {
       "type": "commerce.purchase.created",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "displayName": "Purchase received",
       "description": "Starts when the runtime finds a new paid GGSel purchase.",
       "localization": {
@@ -106,7 +106,9 @@
                 "type": "string"
               }
             },
-            "required": [],
+            "required": [
+              "id"
+            ],
             "additionalProperties": false
           },
           "buyer": {
@@ -125,13 +127,21 @@
             "required": [],
             "additionalProperties": false
           },
-          "options": {
-            "type": "unknown"
+          "optionValues": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "optionChoiceIds": {
+            "type": "object",
+            "additionalProperties": true
           }
         },
         "required": [
           "invoiceId",
-          "status"
+          "status",
+          "product",
+          "optionValues",
+          "optionChoiceIds"
         ],
         "additionalProperties": false
       },
@@ -157,7 +167,8 @@
         "required": [
           "invoiceId",
           "chatId",
-          "sellerId"
+          "sellerId",
+          "productId"
         ],
         "additionalProperties": false
       },
@@ -326,24 +337,74 @@
           "sensitive": true
         },
         {
-          "id": "options",
+          "id": "option-value",
           "source": "payload",
-          "path": "options",
+          "path": "optionValues",
           "valueSchema": {
-            "type": "unknown"
+            "type": "string"
           },
-          "displayName": "Purchase options",
+          "displayName": "Option value",
           "localization": {
             "ru": {
-              "displayName": "Параметры покупки"
+              "displayName": "Значение параметра"
             },
             "en": {
-              "displayName": "Purchase options"
+              "displayName": "Option value"
             }
           },
           "category": "Purchase",
           "order": 70,
-          "availability": "when-present"
+          "availability": "when-present",
+          "keyed": {
+            "guardPath": "product.id",
+            "guardParameter": "productId"
+          }
+        },
+        {
+          "id": "option-choice-id",
+          "source": "payload",
+          "path": "optionChoiceIds",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Stable option choice",
+          "localization": {
+            "ru": {
+              "displayName": "Стабильный вариант параметра"
+            },
+            "en": {
+              "displayName": "Stable option choice"
+            }
+          },
+          "category": "Purchase",
+          "order": 71,
+          "availability": "when-present",
+          "keyed": {
+            "guardPath": "product.id",
+            "guardParameter": "productId"
+          }
+        }
+      ],
+      "bindingCatalogs": [
+        {
+          "id": "ggsel.products",
+          "version": "1.0.0",
+          "displayName": "Products and options",
+          "localization": {
+            "ru": { "displayName": "Товары и параметры" },
+            "en": { "displayName": "Products and options" }
+          },
+          "scope": {
+            "displayName": "Product",
+            "localization": {
+              "ru": { "displayName": "Товар" },
+              "en": { "displayName": "Product" }
+            },
+            "selectorId": "product-id",
+            "guardParameter": "productId"
+          },
+          "valueFieldId": "option-value",
+          "choiceFieldId": "option-choice-id"
         }
       ],
       "inputResolvers": [
@@ -700,7 +761,7 @@
       "requiredEventContext": [
         {
           "eventType": "commerce.purchase.created",
-          "eventVersion": "1.0.0",
+          "eventVersion": "1.1.0",
           "source": "scope",
           "path": "chatId"
         },

@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "funpay.cardinal",
-    "version": "1.2.2",
+    "version": "1.3.0",
     "displayName": "FunPay Cardinal",
     "description": "Получает события FunPay и выполняет действия сценариев Buywell через Cardinal.",
     "publisher": "Buywell",
@@ -45,7 +45,7 @@
   "events": [
     {
       "type": "commerce.purchase.created",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "displayName": "Purchase received",
       "description": "Starts when Cardinal finds a new paid order.",
       "localization": {
@@ -1104,6 +1104,22 @@
           "category": "Review"
         }
       ],
+      "bindingCatalogs": [
+        {
+          "id": "funpay.categories",
+          "version": "1.0.0",
+          "displayName": "Category order fields",
+          "localization": { "ru": { "displayName": "Поля заказа категории" }, "en": { "displayName": "Category order fields" } },
+          "scope": {
+            "displayName": "Category URL",
+            "localization": { "ru": { "displayName": "URL категории" }, "en": { "displayName": "Category URL" } },
+            "selectorId": "category-id",
+            "guardParameter": "subcategoryId"
+          },
+          "valueFieldId": "lot-field",
+          "choiceFieldId": "lot-field"
+        }
+      ],
       "inputResolvers": [
         {
           "id": "funpay.cardinal.collect-input",
@@ -1180,7 +1196,7 @@
     },
     {
       "type": "commerce.purchase.status-changed",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "displayName": "Purchase status changed",
       "localization": {
         "ru": {
@@ -2255,6 +2271,22 @@
           "category": "Review"
         }
       ],
+      "bindingCatalogs": [
+        {
+          "id": "funpay.categories",
+          "version": "1.0.0",
+          "displayName": "Category order fields",
+          "localization": { "ru": { "displayName": "Поля заказа категории" }, "en": { "displayName": "Category order fields" } },
+          "scope": {
+            "displayName": "Category URL",
+            "localization": { "ru": { "displayName": "URL категории" }, "en": { "displayName": "Category URL" } },
+            "selectorId": "category-id",
+            "guardParameter": "subcategoryId"
+          },
+          "valueFieldId": "lot-field",
+          "choiceFieldId": "lot-field"
+        }
+      ],
       "identityFields": [
         "orderId",
         "status"
@@ -2564,13 +2596,13 @@
       "requiredEventContext": [
         {
           "eventType": "commerce.purchase.created",
-          "eventVersion": "1.2.0",
+          "eventVersion": "1.3.0",
           "source": "scope",
           "path": "chatId"
         },
         {
           "eventType": "commerce.purchase.status-changed",
-          "eventVersion": "1.2.0",
+          "eventVersion": "1.3.0",
           "source": "scope",
           "path": "chatId"
         },

@@ -1,5 +1,10 @@
 # FunPay Cardinal changelog
 
+## 1.3.0 — July 22, 2026
+
+- Connection setup can now accept a regular FunPay category URL; Cardinal loads its custom order fields and choices directly.
+- New connections store the category and mappings by stable keys, while Console imports remain compatible with existing connections.
+
 ## 1.2.2 — July 22, 2026
 
 - The buyer question and invalid-response message can now be left empty. Cardinal will still wait for and validate a reply without sending an empty message.

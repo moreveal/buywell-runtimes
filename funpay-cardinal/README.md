@@ -16,3 +16,7 @@ a Cardinal plugin; it is not a standalone FunPay client.
 
 `BUYWELL_API_URL` may override the default `https://buywell.pro/api` endpoint
 before Cardinal starts.
+
+Version 1.3.0 lets Buywell load category-specific order fields directly from a
+regular `https://funpay.com/lots/<ID>/` URL through the connected Cardinal
+runtime. Existing Console-imported connections remain valid.

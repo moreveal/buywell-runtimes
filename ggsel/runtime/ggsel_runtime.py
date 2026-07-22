@@ -8,11 +8,10 @@ import logging
 import os
 import signal
 import sqlite3
-import ssl
 import threading
 import time
-import urllib.error
 import urllib.parse
+import urllib.error
 import urllib.request
 import uuid
 from dataclasses import dataclass
@@ -21,18 +20,22 @@ from typing import Any, Iterable, Iterator
 
 try:
     import websocket
+    import httpx
 except ImportError as error:  # pragma: no cover - exercised by the install guide
     raise SystemExit(
-        "Missing dependency websocket-client. Run: python -m pip install -r requirements.txt"
+        "Missing runtime dependency. Run: python -m pip install -r requirements.txt"
     ) from error
 
 
 MODULE_ID = "ggsel.seller"
-MODULE_VERSION = "1.1.0"
+MODULE_VERSION = "1.2.0"
 PROTOCOL_VERSION = "1.0.0"
+BINDING_CATALOG_PROTOCOL_VERSION = "1.0.0"
 PURCHASE_EVENT = "commerce.purchase.created"
 MESSAGE_EVENT = "messaging.message.received"
-EVENT_VERSION = "1.0.0"
+PURCHASE_EVENT_VERSION = "1.1.0"
+MESSAGE_EVENT_VERSION = "1.0.0"
+EVENT_VERSION = PURCHASE_EVENT_VERSION
 SEND_MESSAGE_NODE = "ggsel.seller/send-message"
 
 STOP = threading.Event()
@@ -88,6 +91,8 @@ class Config:
     request_timeout_seconds: float
     emit_existing_on_first_start: bool
     log_level: str
+    connect_timeout_seconds: float = 10
+    read_timeout_seconds: float = 30
 
     @classmethod
     def load(cls, path: Path) -> "Config":
@@ -113,6 +118,8 @@ class Config:
             "message_poll_interval_seconds",
             "sales_window",
             "request_timeout_seconds",
+            "connect_timeout_seconds",
+            "read_timeout_seconds",
             "emit_existing_on_first_start",
             "log_level",
         }
@@ -195,6 +202,8 @@ class Config:
             ),
             emit_existing_on_first_start=emit_existing,
             log_level=log_level,
+            connect_timeout_seconds=bounded_number("connect_timeout_seconds",10,1,60),
+            read_timeout_seconds=bounded_number("read_timeout_seconds",raw.get("request_timeout_seconds",30),1,300),
         )
 
 
@@ -457,6 +466,7 @@ class GGSelClient:
         self.config = config
         self.token: str | None = None
         self.token_lock = threading.Lock()
+        self.http = httpx.Client(timeout=httpx.Timeout(self.config.read_timeout_seconds,connect=self.config.connect_timeout_seconds),limits=httpx.Limits(max_connections=8,max_keepalive_connections=4))
 
     def _request(
         self,
@@ -468,31 +478,26 @@ class GGSelClient:
         authenticated: bool = False,
         headers: dict[str, str] | None = None,
         retry_auth: bool = True,
+        retry_readonly: bool | None = None,
     ) -> Any:
         query = dict(params or {})
         if authenticated:
             if not self.token:
                 self.login()
             query["token"] = self.token
-        encoded_query = urllib.parse.urlencode(query)
         url = f"{self.config.ggsel_api_url}/{path.lstrip('/')}"
-        if encoded_query:
-            url += "?" + encoded_query
         request_headers = {"Accept": "application/json", **(headers or {})}
-        data = None
-        if body is not None:
-            data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-            request_headers["Content-Type"] = "application/json"
-        request = urllib.request.Request(url, data=data, headers=request_headers, method=method)
-        try:
-            with urllib.request.urlopen(
-                request,
-                timeout=self.config.request_timeout_seconds,
-                context=ssl.create_default_context(),
-            ) as response:
-                raw = response.read().decode("utf-8")
-        except urllib.error.HTTPError as error:
-            if authenticated and error.code in {401, 403} and retry_auth:
+        safe_retry = method == "GET" if retry_readonly is None else retry_readonly
+        response = None
+        attempts = 3 if safe_retry else 1
+        for attempt in range(attempts):
+            try:
+                response=self.http.request(method,url,params=query,json=body,headers=request_headers)
+            except (httpx.TimeoutException,httpx.NetworkError) as error:
+                if attempt+1<attempts:
+                    time.sleep(min(4,2**attempt));continue
+                raise ApiError("temporary_failure" if safe_retry else "outcome_unknown","GGSel request failed",retryable=safe_retry) from error
+            if response.status_code in {401,403} and authenticated and retry_auth:
                 self.token = None
                 self.login()
                 return self._request(
@@ -503,18 +508,18 @@ class GGSelClient:
                     authenticated=True,
                     headers=headers,
                     retry_auth=False,
+                    retry_readonly=retry_readonly,
                 )
-            retryable = error.code in {408, 425, 429, 500, 502, 503, 504}
-            raise ApiError(
-                "rate_limited" if error.code == 429 else "http_error",
-                f"GGSel returned HTTP {error.code}",
-                retryable=retryable,
-            ) from error
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise ApiError("temporary_failure", "GGSel request failed", retryable=True) from error
+            if response.status_code in {408,425,429,500,502,503,504} and attempt+1<attempts:
+                delay=response.headers.get("retry-after");time.sleep(min(10,float(delay)) if delay and delay.isdigit() else min(4,2**attempt));continue
+            break
+        assert response is not None
+        if response.is_error:
+            retryable=safe_retry and response.status_code in {408,425,429,500,502,503,504}
+            raise ApiError("rate_limited" if response.status_code==429 else "http_error",f"GGSel returned HTTP {response.status_code}",retryable=retryable)
         try:
-            return json.loads(raw)
-        except json.JSONDecodeError as error:
+            return response.json()
+        except ValueError as error:
             raise ApiError(
                 "invalid_response", "GGSel returned a non-JSON response", retryable=False
             ) from error
@@ -535,6 +540,7 @@ class GGSelClient:
                     "timestamp": timestamp,
                     "sign": sign,
                 },
+                retry_readonly=True,
             )
             token = data.get("token") if isinstance(data, dict) else None
             if not isinstance(token, str) or not token.strip():
@@ -565,6 +571,16 @@ class GGSelClient:
         )
         if not isinstance(data, dict) or data.get("retval") != 0:
             raise ApiError("invalid_response", "Could not read purchase", retryable=True)
+        return data
+
+    def goods(self) -> list[dict[str,Any]]:
+        data=self._request("POST","seller-goods",body={"seller_id":self.config.seller_id},authenticated=True,retry_readonly=True)
+        candidates=data if isinstance(data,list) else next((data.get(key) for key in ("goods","products","items","rows") if isinstance(data.get(key),list)),[]) if isinstance(data,dict) else []
+        return [item for item in candidates if isinstance(item,dict)]
+
+    def product_data(self,product_id:str)->dict[str,Any]:
+        data=self._request("GET",f"products/{product_id}/data",authenticated=True)
+        if not isinstance(data,dict):raise ApiError("invalid_response","Could not read product options",retryable=True)
         return data
 
     def chats_with_new_messages(self) -> list[int]:
@@ -614,9 +630,10 @@ class GGSelClient:
             params={"id_i": chat_id},
             body={"message": cleaned},
             authenticated=True,
+            retry_readonly=False,
         )
         if not isinstance(data, dict) or data.get("retval") != 0:
-            raise ApiError("outcome_unknown", "GGSel did not confirm delivery", retryable=True)
+            raise ApiError("outcome_unknown", "GGSel did not confirm delivery", retryable=False)
 
 
 def _path(source: dict[str, Any], path: str) -> Any:
@@ -667,7 +684,7 @@ def _captured(event_type: str, payload: dict[str, Any], scope: dict[str, Any]) -
         subscriptions = list(CAPTURE_SPEC.get("subscriptions", []))
     return any(
         item.get("eventType") == event_type
-        and item.get("eventVersion") == EVENT_VERSION
+        and item.get("eventVersion") == (PURCHASE_EVENT_VERSION if event_type==PURCHASE_EVENT else MESSAGE_EVENT_VERSION)
         and any(_condition(rule, payload, scope) for rule in item.get("conditions", []))
         for item in subscriptions
     )
@@ -680,7 +697,7 @@ def _expected(event_type: str) -> bool:
     if revision <= 0:
         return True
     return any(
-        item.get("eventType") == event_type and item.get("eventVersion") == EVENT_VERSION
+        item.get("eventType") == event_type and item.get("eventVersion") == (PURCHASE_EVENT_VERSION if event_type==PURCHASE_EVENT else MESSAGE_EVENT_VERSION)
         for item in subscriptions
     )
 
@@ -700,7 +717,7 @@ def _enqueue_event(
             "moduleId": MODULE_ID,
             "moduleVersion": MODULE_VERSION,
             "eventType": event_type,
-            "eventVersion": EVENT_VERSION,
+            "eventVersion": PURCHASE_EVENT_VERSION if event_type==PURCHASE_EVENT else MESSAGE_EVENT_VERSION,
             "eventId": event_id,
             "payload": payload,
             "scope": scope,
@@ -716,17 +733,29 @@ def _clean(value: Any) -> Any:
     return value
 
 
-def _purchase_event(config: Config, invoice_id: int, response: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def _purchase_event(config: Config, invoice_id: int, response: dict[str, Any], sale: dict[str,Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     content = response.get("content", {})
     if not isinstance(content, dict):
         content = {}
     buyer = content.get("buyer_info", {})
     if not isinstance(buyer, dict):
         buyer = {}
+    sale_product=sale.get("product",{}) if isinstance(sale.get("product"),dict) else {}
+    product_id=sale_product.get("id",sale.get("product_id"))
+    try: product_id=int(product_id)
+    except (TypeError,ValueError): raise ApiError("invalid_response","Recent sale does not include a product ID",retryable=True)
+    if product_id<=0: raise ApiError("invalid_response","Recent sale has an invalid product ID",retryable=True)
+    options=content.get("options",content.get("purchase_options",[]))
+    option_values:dict[str,Any]={};option_choice_ids:dict[str,str]={}
+    if isinstance(options,list):
+        for option in options:
+            if not isinstance(option,dict) or option.get("id") is None:continue
+            key=str(option["id"]);option_values[key]=option.get("user_data")
+            if option.get("user_data_id") is not None:option_choice_ids[key]=str(option["user_data_id"])
     product = {
-        "id": content.get("item_id"),
+        "id": product_id,
         "contentId": content.get("content_id"),
-        "name": content.get("name"),
+        "name": sale_product.get("name",sale.get("product_name")),
     }
     payload = _clean(
         {
@@ -745,7 +774,8 @@ def _purchase_event(config: Config, invoice_id: int, response: dict[str, Any]) -
                 "email": buyer.get("email"),
                 "account": buyer.get("account"),
             },
-            "options": content.get("options", content.get("purchase_options")),
+            "optionValues": option_values,
+            "optionChoiceIds": option_choice_ids,
         }
     )
     scope = _clean(
@@ -805,7 +835,7 @@ class Poller:
             if not is_new or not emit_existing:
                 continue
             response = self.client.purchase(invoice_id)
-            payload, scope = _purchase_event(self.config, invoice_id, response)
+            payload, scope = _purchase_event(self.config, invoice_id, response, sale)
             _enqueue_event(
                 self.state,
                 PURCHASE_EVENT,
@@ -1045,6 +1075,50 @@ def _execute_action(
         }
 
 
+def _catalog_result(client:GGSelClient,job:dict[str,Any])->dict[str,Any]:
+    identity={"protocolVersion":BINDING_CATALOG_PROTOCOL_VERSION,"requestId":str(job.get("requestId","")),"catalogId":str(job.get("catalogId","")),"catalogVersion":str(job.get("catalogVersion",""))}
+    if identity["catalogId"]!="ggsel.products" or identity["catalogVersion"]!="1.0.0":raise ApiError("unsupported_catalog","Unsupported binding catalog",retryable=False)
+    operation=str(job.get("operation",""))
+    if operation=="list-scopes":
+        query=str(job.get("query","")).casefold().strip();goods=[]
+        for item in client.goods():
+            key=next((str(item.get(name)) for name in ("id","product_id","id_goods","productId") if item.get(name) is not None),"")
+            label=next((str(item.get(name)) for name in ("name","product_name","name_goods","title") if item.get(name)),key)
+            if key and (not query or query in label.casefold() or query in key):goods.append({"key":key,"label":label[:500]})
+        goods.sort(key=lambda item:(item["label"].casefold(),item["key"]))
+        try:offset=max(0,int(job.get("cursor",0)))
+        except (TypeError,ValueError):offset=0
+        page=goods[offset:offset+100];value={**identity,"operation":operation,"scopes":page}
+        if offset+len(page)<len(goods):value["nextCursor"]=str(offset+len(page))
+        return value
+    if operation=="get-scope":
+        scope_key=str(job.get("scopeKey",""));data=client.product_data(scope_key)
+        product=data.get("content",data.get("product",data));product=product if isinstance(product,dict) else data
+        label=next((str(product.get(name)) for name in ("name","product_name","title") if product.get(name)),scope_key)
+        options=next((product.get(name) for name in ("options","params","fields") if isinstance(product.get(name),list)),[])
+        fields=[]
+        for option in options:
+            if not isinstance(option,dict):continue
+            key=next((str(option.get(name)) for name in ("name","id","option_id") if option.get(name) is not None),"")
+            field_label=next((str(option.get(name)) for name in ("label","text","title","caption") if option.get(name)),key)
+            raw_choices=next((option.get(name) for name in ("variants","values","items","choices") if isinstance(option.get(name),list)),[])
+            choices=[]
+            for choice in raw_choices:
+                if not isinstance(choice,dict):continue
+                choice_key=next((str(choice.get(name)) for name in ("value","id","user_data_id") if choice.get(name) is not None),"")
+                choice_label=next((str(choice.get(name)) for name in ("text","label","name","title") if choice.get(name)),choice_key)
+                if choice_key:choices.append({"key":choice_key,"label":choice_label[:500]})
+            if key:fields.append({"key":key,"label":field_label[:500],"kind":"choice" if choices else "text",**({"choices":choices[:500]} if choices else {})})
+        return {**identity,"operation":operation,"scope":{"key":scope_key,"label":label[:500]},"fields":fields[:200]}
+    raise ApiError("unsupported_operation","Unsupported catalog operation",retryable=False)
+
+
+def _execute_catalog(client:GGSelClient,job:dict[str,Any])->dict[str,Any]:
+    try:return{"status":"success","value":_catalog_result(client,job)}
+    except ApiError as error:return{"status":"error","error":{"code":error.code,"message":str(error)[:500]}}
+    except Exception as error:logger.exception("Catalog request failed");return{"status":"error","error":{"code":"temporary_failure","message":str(error)[:500] or "Catalog request failed"}}
+
+
 def _connect_socket(config: Config, state: State, client: GGSelClient) -> None:
     _buywell_request(
         config,
@@ -1190,6 +1264,9 @@ def _connect_socket(config: Config, state: State, client: GGSelClient) -> None:
                         ensure_ascii=False,
                     )
                 )
+            elif message_type == "catalog.request":
+                job=message["job"]
+                channel.send(json.dumps({"type":"catalog.result","jobId":job["jobId"],"leaseToken":job["leaseToken"],"result":_execute_catalog(client,job)},ensure_ascii=False))
             elif message_type == "input.request":
                 job = message["job"]
                 pending_input_jobs[str(job["jobId"])] = job

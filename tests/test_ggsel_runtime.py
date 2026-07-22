@@ -28,7 +28,7 @@ spec.loader.exec_module(runtime)
 
 class FakeClient:
     def __init__(self) -> None:
-        self.sales = [{"invoice_id": 100, "date": "2026-01-01"}]
+        self.sales = [{"invoice_id": 100, "date": "2026-01-01", "product": {"id": 102602697, "name": "Discord Boosts"}}]
         self.message_rows: dict[int, list[dict]] = {}
         self.purchase_calls: list[int] = []
 
@@ -41,10 +41,11 @@ class FakeClient:
             "retval": 0,
             "content": {
                 "invoice_state": 1,
-                "name": "Product",
+                "name": "delivered-secret-content",
                 "amount": 100,
                 "currency_type": "RUB",
                 "buyer_info": {"email": "buyer@example.com"},
+                "options": [{"id": 5699177, "user_data": "https://discord.gg/example"}, {"id": 5699176, "user_data": "5 boosts", "user_data_id": 32074498}],
             },
         }
 
@@ -94,6 +95,29 @@ class ConfigTests(unittest.TestCase):
             )
             value = runtime.Config.load(path)
             self.assertEqual(value.database_path, directory / "state/ggsel-runtime.sqlite3")
+
+
+class ClientRetryTests(unittest.TestCase):
+    def test_read_requests_retry_after_a_network_failure(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("GET", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.side_effect = [runtime.httpx.ReadTimeout("timeout", request=request), runtime.httpx.Response(200, json={"retval": 0}, request=request)]
+        with mock.patch.object(runtime.time, "sleep"):
+            self.assertEqual(client._request("GET", "test", authenticated=True), {"retval": 0})
+        self.assertEqual(client.http.request.call_count, 2)
+
+    def test_message_send_is_not_retried_after_an_unknown_result(self):
+        client = runtime.GGSelClient(config(Path("state.sqlite3")))
+        client.token = "token"
+        request = runtime.httpx.Request("POST", "https://seller.ggsel.com/test")
+        client.http = mock.Mock()
+        client.http.request.side_effect = runtime.httpx.ReadTimeout("timeout", request=request)
+        with self.assertRaises(runtime.ApiError) as failure:
+            client.send_message(42, "Hello")
+        self.assertEqual(failure.exception.code, "outcome_unknown")
+        self.assertEqual(client.http.request.call_count, 1)
 
     def test_remote_plain_http_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -210,7 +234,7 @@ class BuywellProtocolTests(unittest.TestCase):
                     "moduleId": runtime.MODULE_ID,
                     "moduleVersion": runtime.MODULE_VERSION,
                     "eventType": runtime.PURCHASE_EVENT,
-                    "eventVersion": runtime.EVENT_VERSION,
+                    "eventVersion": runtime.PURCHASE_EVENT_VERSION,
                     "eventId": "ggsel:7:purchase:100",
                     "payload": {"invoiceId": "100", "status": "1"},
                     "scope": {"invoiceId": "100", "chatId": 100, "sellerId": 7},
@@ -377,14 +401,14 @@ class PollingTests(unittest.TestCase):
             "subscriptions": [
                 {
                     "eventType": runtime.PURCHASE_EVENT,
-                    "eventVersion": runtime.EVENT_VERSION,
+                    "eventVersion": runtime.PURCHASE_EVENT_VERSION,
                     "conditions": [
                         {"source": "scope", "path": "sellerId", "operator": "exists"}
                     ],
                 },
                 {
                     "eventType": runtime.MESSAGE_EVENT,
-                    "eventVersion": runtime.EVENT_VERSION,
+                    "eventVersion": runtime.MESSAGE_EVENT_VERSION,
                     "conditions": [
                         {"source": "scope", "path": "chatId", "operator": "exists"}
                     ],
@@ -400,11 +424,23 @@ class PollingTests(unittest.TestCase):
             poller = runtime.Poller(config(state.path), state, client)
             poller.poll_sales()
             self.assertEqual(state.outbox(), [])
-            client.sales.append({"invoice_id": 101, "date": "2026-01-02"})
+            client.sales.append({"invoice_id": 101, "date": "2026-01-02", "product": {"id": 102602697, "name": "Discord Boosts"}})
             poller.poll_sales()
             rows = state.outbox()
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0][1]["eventId"], "ggsel:7:purchase:101")
+            payload=rows[0][1]["payload"]
+            self.assertEqual(payload["product"],{"id":102602697,"name":"Discord Boosts"})
+            self.assertNotIn("delivered-secret-content",json.dumps(payload))
+            self.assertEqual(payload["optionValues"]["5699176"],"5 boosts")
+            self.assertEqual(payload["optionChoiceIds"]["5699176"],"32074498")
+
+    def test_catalog_uses_option_and_variant_ids(self):
+        client=mock.Mock()
+        client.product_data.return_value={"product":{"id":102602697,"name":"Discord Boosts","options":[{"name":5699177,"label":"Invite","type":"text","variants":[]},{"name":5699176,"label":"Boosts","type":"radio","variants":[{"value":32074498,"text":"5 boosts · 1 month"}]}]}}
+        result=runtime._catalog_result(client,{"requestId":"00000000-0000-4000-8000-000000000001","catalogId":"ggsel.products","catalogVersion":"1.0.0","operation":"get-scope","scopeKey":"102602697"})
+        self.assertEqual(result["fields"][0],{"key":"5699177","label":"Invite","kind":"text"})
+        self.assertEqual(result["fields"][1]["choices"],[{"key":"32074498","label":"5 boosts · 1 month"}])
 
     def test_only_buyer_messages_emit(self):
         with tempfile.TemporaryDirectory() as temporary:
