@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import html
+from html.parser import HTMLParser
 import logging
 import os
 import sqlite3
@@ -10,6 +12,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -26,8 +29,8 @@ if TYPE_CHECKING:
     from cardinal import Cardinal
 
 NAME = "Buywell"
-VERSION = "1.2.2"
-PURCHASE_EVENT_VERSION = "1.2.0"
+VERSION = "1.3.0"
+PURCHASE_EVENT_VERSION = "1.3.0"
 DESCRIPTION = "Связывает FunPay Cardinal с вашими сценариями Buywell."
 CREDITS = "Buywell"
 UUID = "f01c34c5-a7ea-43a4-9136-8ad5ce5c8154"
@@ -47,6 +50,68 @@ DEFAULT_BUYWELL_URL = os.environ.get("BUYWELL_API_URL", "https://buywell.pro/api
 EDIT_KEY = "Buywell_EditKey"
 KEY_EDITED = "Buywell_KeyEdited"
 TOGGLE = "Buywell_Toggle"
+BINDING_CATALOG_VERSION = "1.0.0"
+
+
+class _CategoryParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True);self.depth=0;self.field_depth=None;self.current=None;self.fields={};self.descriptors={};self.in_h1=False;self.category=[]
+    def handle_starttag(self,tag,attrs):
+        values=dict(attrs);classes=set(values.get("class","").split())
+        if tag=="h1":self.in_h1=True
+        if "lot-fields" in classes and values.get("data-fields"):
+            try:
+                for item in json.loads(html.unescape(values["data-fields"])):
+                    if isinstance(item,dict) and item.get("id") is not None:self.descriptors[str(item["id"])]=item
+            except (ValueError,TypeError):pass
+        if "lot-field" in classes and values.get("data-id"):
+            key=str(values["data-id"]);descriptor=self.descriptors.get(key,{})
+            self.current={"key":key,"label":str(descriptor.get("name") or key),"choices":[],"siteType":str(descriptor.get("type") or "text")};self.fields[key]=self.current;self.field_depth=self.depth
+        if self.current is not None:
+            if tag in ("input","select","textarea") and values.get("name"):self.current["htmlName"]=values["name"]
+            if tag=="select":self.current["siteType"]="choice"
+            if values.get("value") and (tag=="option" or "lot-field-radio-box" in classes or tag=="button"):
+                choice=str(values["value"])
+                if choice not in self.current["choices"]:self.current["choices"].append(choice)
+        self.depth+=1
+    def handle_endtag(self,tag):
+        self.depth=max(0,self.depth-1)
+        if tag=="h1":self.in_h1=False
+        if self.field_depth is not None and self.depth<=self.field_depth:self.current=None;self.field_depth=None
+    def handle_data(self,data):
+        if self.in_h1 and data.strip():self.category.append(data.strip())
+
+
+def _category_url(value:str)->tuple[str,str]:
+    parsed=urllib.parse.urlsplit(value.strip());match=__import__("re").fullmatch(r"/lots/(\d{1,20})/?",parsed.path)
+    if parsed.scheme!="https" or parsed.hostname not in {"funpay.com","www.funpay.com"} or not match or parsed.query or parsed.fragment:raise ValueError("invalid_category_url")
+    return match.group(1),f"https://funpay.com/lots/{match.group(1)}/"
+
+
+def _category_catalog(cardinal:"Cardinal",category_id:str)->dict[str,Any]:
+    url=f"https://funpay.com/lots/{category_id}/";session=getattr(cardinal.account,"session",None)
+    if session is None or not hasattr(session,"get"):raise RuntimeError("funpay_session_unavailable")
+    response=session.get(url,timeout=(10,30));response.raise_for_status();parser=_CategoryParser();parser.feed(response.text)
+    if not parser.fields:raise RuntimeError("category_fields_unavailable")
+    return{"key":category_id,"label":" ".join(parser.category).strip() or f"FunPay {category_id}","fields":list(parser.fields.values())}
+
+
+def _catalog_job(cardinal:"Cardinal",job:dict[str,Any])->dict[str,Any]:
+    try:
+        if job.get("catalogId")!="funpay.categories" or job.get("catalogVersion")!=BINDING_CATALOG_VERSION:raise ValueError("unsupported_catalog")
+        identity={"protocolVersion":BINDING_CATALOG_VERSION,"requestId":job["requestId"],"catalogId":job["catalogId"],"catalogVersion":job["catalogVersion"]}
+        if job.get("operation")=="list-scopes":
+            category_id,_=_category_url(str(job.get("query","")));catalog=_category_catalog(cardinal,category_id)
+            value={**identity,"operation":"list-scopes","scopes":[{"key":catalog["key"],"label":catalog["label"]}]}
+        elif job.get("operation")=="get-scope":
+            category_id=str(job.get("scopeKey",""));catalog=_category_catalog(cardinal,category_id);fields=[]
+            for field in catalog["fields"]:
+                choices=[{"key":choice,"label":choice} for choice in field["choices"]]
+                fields.append({"key":field["key"],"label":field["label"],"kind":"choice" if choices else "text",**({"choices":choices} if choices else {})})
+            value={**identity,"operation":"get-scope","scope":{"key":catalog["key"],"label":catalog["label"]},"fields":fields}
+        else:raise ValueError("unsupported_operation")
+        return{"status":"success","value":value}
+    except Exception as error:return{"status":"error","error":{"code":str(error)[:128] or "catalog_failed","message":"Could not read the FunPay category"}}
 
 
 def _websocket_client() -> Any:
@@ -485,6 +550,9 @@ def _worker(cardinal: "Cardinal") -> None:
                 elif message.get("type") == "action.request":
                     job = message["job"]
                     channel.send(json.dumps({"type": "action.result", "jobId": job["jobId"], "leaseToken": job["leaseToken"], "result": _execute_job_result(cardinal, job)}))
+                elif message.get("type") == "catalog.request":
+                    job=message["job"]
+                    channel.send(json.dumps({"type":"catalog.result","jobId":job["jobId"],"leaseToken":job["leaseToken"],"result":_catalog_job(cardinal,job)},ensure_ascii=False))
                 elif message.get("type") == "input.request":
                     job = message["job"]; pending_input_jobs[job["jobId"]] = job
                     channel.send(json.dumps({"type": "input.waiting", "jobId": job["jobId"], "leaseToken": job["leaseToken"]}))

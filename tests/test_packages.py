@@ -54,13 +54,13 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(resolver["abstractionId"], "messaging.collect-input")
             self.assertEqual(resolver["requiredContext"], [{"source": "scope", "path": "chatId"}])
 
-    def test_ggsel_1_1_keeps_the_core_public_contract_only(self):
+    def test_ggsel_1_2_adds_stable_product_catalog(self):
         manifest = json.loads((ROOT / "ggsel" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["module"]["version"], "1.1.0")
+        self.assertEqual(manifest["module"]["version"], "1.2.0")
         self.assertEqual(
             [(event["type"], event["version"]) for event in manifest["events"]],
             [
-                ("commerce.purchase.created", "1.0.0"),
+                ("commerce.purchase.created", "1.1.0"),
                 ("messaging.message.received", "1.0.0"),
             ],
         )
@@ -72,6 +72,16 @@ class PackageTests(unittest.TestCase):
             manifest["nodes"][0]["inputSchema"]["properties"],
             {"message": {"type": "string"}},
         )
+
+    def test_funpay_1_3_loads_category_fields_through_cardinal(self):
+        manifest = json.loads((ROOT / "funpay-cardinal" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["module"]["version"], "1.3.0")
+        purchase_events = [event for event in manifest["events"] if event["type"].startswith("commerce.purchase")]
+        self.assertTrue(purchase_events)
+        for event in purchase_events:
+            self.assertEqual(event["version"], "1.3.0")
+            self.assertEqual(event["bindingCatalogs"][0]["id"], "funpay.categories")
+            self.assertEqual(event["bindingCatalogs"][0]["scope"]["selectorId"], "category-id")
 
     def test_ggsel_changelogs_date_every_release(self):
         for locale in ("ru", "en"):
@@ -90,9 +100,9 @@ class PackageTests(unittest.TestCase):
             )
             with zipfile.ZipFile(first_output) as archive:
                 names = archive.namelist()
-                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.1.0.zip")
+                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.2.0.zip")
             self.assertIn("manifest.json", names)
-            self.assertIn("runtime/ggsel-seller-runtime-1.1.0.zip", names)
+            self.assertIn("runtime/ggsel-seller-runtime-1.2.0.zip", names)
             self.assertNotIn("runtime/ggsel_runtime.py", names)
             self.assertNotIn("install.bat", names)
             with zipfile.ZipFile(BytesIO(runtime_archive)) as runtime:
@@ -101,7 +111,7 @@ class PackageTests(unittest.TestCase):
                     runtime_names,
                     sorted(build_packages.RUNTIME_BUNDLES["ggsel"]),
                 )
-                self.assertIn(b'MODULE_VERSION = "1.1.0"', runtime.read("ggsel_runtime.py"))
+                self.assertIn(b'MODULE_VERSION = "1.2.0"', runtime.read("ggsel_runtime.py"))
                 self.assertTrue(runtime.getinfo("install.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("install-service.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("run.sh").external_attr >> 16 & 0o111)

@@ -60,7 +60,8 @@ def main() -> int:
         "poll_interval_seconds": 30,
         "message_poll_interval_seconds": 10,
         "sales_window": 100,
-        "request_timeout_seconds": 30,
+        "connect_timeout_seconds": 10,
+        "read_timeout_seconds": 30,
         "emit_existing_on_first_start": False,
         "log_level": "INFO",
     }

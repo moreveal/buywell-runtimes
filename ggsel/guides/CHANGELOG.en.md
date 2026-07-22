@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 — July 22, 2026
+
+- Added a live product and parameter catalog for configuring workflows with stable IDs.
+- Purchase events now include a required product ID, the safe product name from recent sales, field values, and separate selected-choice IDs.
+- Buyer-delivered content can no longer leak into the product name or ordinary event data.
+- The HTTP client now uses separate timeouts and safe retries for read-only operations only.
+
 ## 1.1.0 — July 22, 2026
 
 - Workflows can now ask a buyer for a value, validate the reply, and continue after a valid response arrives.
