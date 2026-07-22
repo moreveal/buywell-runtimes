@@ -1,0 +1,2604 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "1.0.0",
+  "module": {
+    "id": "funpay.cardinal",
+    "version": "1.2.2",
+    "displayName": "FunPay Cardinal",
+    "description": "Получает события FunPay и выполняет действия сценариев Buywell через Cardinal.",
+    "publisher": "Buywell",
+    "supportedPlatforms": [
+      "FunPay"
+    ]
+  },
+  "package": {
+    "branding": {
+      "icon": "assets/funpay-square-icon.jpg"
+    },
+    "artifact": {
+      "path": "runtime/buywell_runtime.py",
+      "filename": "buywell_runtime.py"
+    },
+    "guides": {
+      "installation": {
+        "ru": "guides/install.ru.md",
+        "en": "guides/install.en.md"
+      },
+      "readme": {
+        "ru": "guides/README.ru.md",
+        "en": "guides/README.en.md"
+      },
+      "changelog": {
+        "ru": "guides/CHANGELOG.ru.md",
+        "en": "guides/CHANGELOG.en.md"
+      }
+    },
+    "compatibility": {
+      "environments": [
+        "FunPay Cardinal 0.1.17.8"
+      ]
+    },
+    "release": {
+      "critical": false
+    }
+  },
+  "events": [
+    {
+      "type": "commerce.purchase.created",
+      "version": "1.2.0",
+      "displayName": "Purchase received",
+      "description": "Starts when Cardinal finds a new paid order.",
+      "localization": {
+        "ru": {
+          "displayName": "Получена покупка",
+          "description": "Запускается, когда Cardinal находит новый оплаченный заказ."
+        },
+        "en": {
+          "displayName": "Purchase received",
+          "description": "Starts when Cardinal finds a new paid order."
+        }
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "closed",
+              "refunded",
+              "partially-refunded",
+              "unpaid"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "en"
+            ]
+          },
+          "buyer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "seller": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "chatId": {
+            "type": "unknown"
+          },
+          "title": {
+            "type": "string"
+          },
+          "fullDescription": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "price": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "usd",
+              "rub",
+              "eur",
+              "unknown"
+            ]
+          },
+          "lotId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "player": {
+            "type": "string"
+          },
+          "subcategory": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "common",
+                  "currency"
+                ]
+              },
+              "category": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "server": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "side": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "review": {
+            "type": "object",
+            "properties": {
+              "stars": {
+                "type": "number"
+              },
+              "text": {
+                "type": "string"
+              },
+              "reply": {
+                "type": "string"
+              },
+              "anonymous": {
+                "type": "boolean"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "author": {
+                "type": "string"
+              },
+              "authorId": {
+                "type": "number"
+              },
+              "byBot": {
+                "type": "boolean"
+              },
+              "replyByBot": {
+                "type": "boolean"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "lotFields": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "orderId",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "scopeSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "chatId": {
+            "type": "unknown"
+          },
+          "buyerId": {
+            "type": "number"
+          },
+          "buyerUsername": {
+            "type": "string"
+          },
+          "lotId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "chatId"
+        ],
+        "additionalProperties": false
+      },
+      "selectors": [
+        {
+          "id": "lot-id",
+          "displayName": "Lot ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID лота"
+            },
+            "en": {
+              "displayName": "Lot ID"
+            }
+          },
+          "source": "scope",
+          "path": "lotId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "category-id",
+          "displayName": "Category ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID категории"
+            },
+            "en": {
+              "displayName": "Category ID"
+            }
+          },
+          "source": "scope",
+          "path": "categoryId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "order-id",
+          "displayName": "Order number",
+          "localization": {
+            "ru": {
+              "displayName": "Номер заказа"
+            },
+            "en": {
+              "displayName": "Order number"
+            }
+          },
+          "source": "payload",
+          "path": "orderId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "title",
+          "displayName": "Item name",
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          },
+          "source": "payload",
+          "path": "title",
+          "operators": [
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in",
+            "exists"
+          ]
+        },
+        {
+          "id": "buyer-username",
+          "displayName": "Buyer username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя покупателя"
+            },
+            "en": {
+              "displayName": "Buyer username"
+            }
+          },
+          "source": "scope",
+          "path": "buyerUsername",
+          "operators": [
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in",
+            "exists"
+          ]
+        },
+        {
+          "id": "currency-code",
+          "displayName": "Currency code",
+          "localization": {
+            "ru": {
+              "displayName": "Код валюты"
+            },
+            "en": {
+              "displayName": "Currency code"
+            }
+          },
+          "source": "payload",
+          "path": "currency",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        }
+      ],
+      "bindingFields": [
+        {
+          "id": "order-id",
+          "displayName": "Order number",
+          "localization": {
+            "ru": {
+              "displayName": "Номер заказа"
+            },
+            "en": {
+              "displayName": "Order number"
+            }
+          },
+          "source": "payload",
+          "path": "orderId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "recommended": true,
+          "availability": "always",
+          "category": "Order"
+        },
+        {
+          "id": "status",
+          "displayName": "Order status",
+          "localization": {
+            "ru": {
+              "displayName": "Статус заказа"
+            },
+            "en": {
+              "displayName": "Order status"
+            }
+          },
+          "source": "payload",
+          "path": "status",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "closed",
+              "refunded",
+              "partially-refunded",
+              "unpaid"
+            ]
+          },
+          "availability": "always",
+          "category": "Order"
+        },
+        {
+          "id": "created-at",
+          "displayName": "Created at",
+          "localization": {
+            "ru": {
+              "displayName": "Дата создания"
+            },
+            "en": {
+              "displayName": "Created at"
+            }
+          },
+          "source": "payload",
+          "path": "createdAt",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Order"
+        },
+        {
+          "id": "locale",
+          "displayName": "Order language code",
+          "localization": {
+            "ru": {
+              "displayName": "Код языка заказа"
+            },
+            "en": {
+              "displayName": "Order language code"
+            }
+          },
+          "source": "payload",
+          "path": "locale",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "en"
+            ]
+          },
+          "availability": "when-present",
+          "category": "Order"
+        },
+        {
+          "id": "item-title",
+          "displayName": "Item name",
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          },
+          "source": "payload",
+          "path": "title",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "full-description",
+          "displayName": "Full description",
+          "localization": {
+            "ru": {
+              "displayName": "Полное описание"
+            },
+            "en": {
+              "displayName": "Full description"
+            }
+          },
+          "source": "payload",
+          "path": "fullDescription",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "quantity",
+          "displayName": "Quantity",
+          "localization": {
+            "ru": {
+              "displayName": "Количество"
+            },
+            "en": {
+              "displayName": "Quantity"
+            }
+          },
+          "source": "payload",
+          "path": "quantity",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "price",
+          "displayName": "Order total",
+          "localization": {
+            "ru": {
+              "displayName": "Сумма заказа"
+            },
+            "en": {
+              "displayName": "Order total"
+            }
+          },
+          "source": "payload",
+          "path": "price",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "currency-code",
+          "displayName": "Currency code",
+          "localization": {
+            "ru": {
+              "displayName": "Код валюты"
+            },
+            "en": {
+              "displayName": "Currency code"
+            }
+          },
+          "source": "payload",
+          "path": "currency",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "usd",
+              "rub",
+              "eur",
+              "unknown"
+            ]
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "lot-id",
+          "displayName": "Lot ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID лота"
+            },
+            "en": {
+              "displayName": "Lot ID"
+            }
+          },
+          "source": "payload",
+          "path": "lotId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-id",
+          "displayName": "Category ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID категории"
+            },
+            "en": {
+              "displayName": "Category ID"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.id",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-name",
+          "displayName": "Category name",
+          "localization": {
+            "ru": {
+              "displayName": "Название категории"
+            },
+            "en": {
+              "displayName": "Category name"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-full-name",
+          "displayName": "Full category name",
+          "localization": {
+            "ru": {
+              "displayName": "Полное название категории"
+            },
+            "en": {
+              "displayName": "Full category name"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.fullName",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-type",
+          "displayName": "Category type",
+          "localization": {
+            "ru": {
+              "displayName": "Тип категории"
+            },
+            "en": {
+              "displayName": "Category type"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.type",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "common",
+              "currency"
+            ]
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "parent-category-id",
+          "displayName": "Parent category ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID родительской категории"
+            },
+            "en": {
+              "displayName": "Parent category ID"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.category.id",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "parent-category-name",
+          "displayName": "Parent category name",
+          "localization": {
+            "ru": {
+              "displayName": "Название родительской категории"
+            },
+            "en": {
+              "displayName": "Parent category name"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.category.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "lot-field",
+          "displayName": "Order field",
+          "localization": {
+            "ru": {
+              "displayName": "Поле заказа"
+            },
+            "en": {
+              "displayName": "Order field"
+            }
+          },
+          "source": "payload",
+          "path": "lotFields",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item",
+          "keyed": {
+            "guardPath": "subcategory.id",
+            "guardParameter": "subcategoryId"
+          }
+        },
+        {
+          "id": "player",
+          "displayName": "Character name",
+          "localization": {
+            "ru": {
+              "displayName": "Имя персонажа"
+            },
+            "en": {
+              "displayName": "Character name"
+            }
+          },
+          "source": "payload",
+          "path": "player",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "server-id",
+          "displayName": "Server ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID сервера"
+            },
+            "en": {
+              "displayName": "Server ID"
+            }
+          },
+          "source": "payload",
+          "path": "server.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "server-name",
+          "displayName": "Server name",
+          "localization": {
+            "ru": {
+              "displayName": "Название сервера"
+            },
+            "en": {
+              "displayName": "Server name"
+            }
+          },
+          "source": "payload",
+          "path": "server.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "side-id",
+          "displayName": "Side ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID стороны"
+            },
+            "en": {
+              "displayName": "Side ID"
+            }
+          },
+          "source": "payload",
+          "path": "side.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "side-name",
+          "displayName": "Side name",
+          "localization": {
+            "ru": {
+              "displayName": "Название стороны"
+            },
+            "en": {
+              "displayName": "Side name"
+            }
+          },
+          "source": "payload",
+          "path": "side.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "buyer-id",
+          "displayName": "Buyer ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID покупателя"
+            },
+            "en": {
+              "displayName": "Buyer ID"
+            }
+          },
+          "source": "payload",
+          "path": "buyer.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "buyer-username",
+          "displayName": "Buyer username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя покупателя"
+            },
+            "en": {
+              "displayName": "Buyer username"
+            }
+          },
+          "source": "payload",
+          "path": "buyer.username",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "seller-id",
+          "displayName": "Seller ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID продавца"
+            },
+            "en": {
+              "displayName": "Seller ID"
+            }
+          },
+          "source": "payload",
+          "path": "seller.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "seller-username",
+          "displayName": "Seller username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя продавца"
+            },
+            "en": {
+              "displayName": "Seller username"
+            }
+          },
+          "source": "payload",
+          "path": "seller.username",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "review-stars",
+          "displayName": "Review stars",
+          "localization": {
+            "ru": {
+              "displayName": "Оценка отзыва"
+            },
+            "en": {
+              "displayName": "Review stars"
+            }
+          },
+          "source": "payload",
+          "path": "review.stars",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-text",
+          "displayName": "Review text",
+          "localization": {
+            "ru": {
+              "displayName": "Текст отзыва"
+            },
+            "en": {
+              "displayName": "Review text"
+            }
+          },
+          "source": "payload",
+          "path": "review.text",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-reply",
+          "displayName": "Review reply",
+          "localization": {
+            "ru": {
+              "displayName": "Ответ на отзыв"
+            },
+            "en": {
+              "displayName": "Review reply"
+            }
+          },
+          "source": "payload",
+          "path": "review.reply",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-anonymous",
+          "displayName": "Anonymous review",
+          "localization": {
+            "ru": {
+              "displayName": "Анонимный отзыв"
+            },
+            "en": {
+              "displayName": "Anonymous review"
+            }
+          },
+          "source": "payload",
+          "path": "review.anonymous",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-hidden",
+          "displayName": "Hidden review",
+          "localization": {
+            "ru": {
+              "displayName": "Отзыв скрыт"
+            },
+            "en": {
+              "displayName": "Hidden review"
+            }
+          },
+          "source": "payload",
+          "path": "review.hidden",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-author",
+          "displayName": "Review author",
+          "localization": {
+            "ru": {
+              "displayName": "Автор отзыва"
+            },
+            "en": {
+              "displayName": "Review author"
+            }
+          },
+          "source": "payload",
+          "path": "review.author",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-author-id",
+          "displayName": "Review author ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID автора отзыва"
+            },
+            "en": {
+              "displayName": "Review author ID"
+            }
+          },
+          "source": "payload",
+          "path": "review.authorId",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-by-bot",
+          "displayName": "Review added by bot",
+          "localization": {
+            "ru": {
+              "displayName": "Отзыв добавлен ботом"
+            },
+            "en": {
+              "displayName": "Review added by bot"
+            }
+          },
+          "source": "payload",
+          "path": "review.byBot",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-reply-by-bot",
+          "displayName": "Review reply added by bot",
+          "localization": {
+            "ru": {
+              "displayName": "Ответ на отзыв добавлен ботом"
+            },
+            "en": {
+              "displayName": "Review reply added by bot"
+            }
+          },
+          "source": "payload",
+          "path": "review.replyByBot",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        }
+      ],
+      "inputResolvers": [
+        {
+          "id": "funpay.cardinal.collect-input",
+          "version": "1.0.0",
+          "abstractionId": "messaging.collect-input",
+          "abstractionVersion": "1.1.0",
+          "displayName": "Ask buyer",
+          "description": "Asks the buyer for a value and lets Buywell validate every response.",
+          "localization": {
+            "ru": {
+              "displayName": "Спросить покупателя",
+              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
+            },
+            "en": {
+              "displayName": "Ask buyer",
+              "description": "Asks in the current chat and sends responses to Buywell for validation."
+            }
+          },
+          "outputSchema": {
+            "type": "unknown"
+          },
+          "parameterSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "invalidResponse": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "validator": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "timeoutSeconds": {
+                "type": "integer"
+              },
+              "maxInvalidAttempts": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "prompt",
+              "invalidResponse",
+              "validator"
+            ],
+            "additionalProperties": false
+          },
+          "mode": "deferred",
+          "sensitive": true,
+          "requiredContext": [
+            {
+              "source": "scope",
+              "path": "chatId"
+            }
+          ],
+          "ui": {
+            "category": "Messaging",
+            "order": 10,
+            "recommended": true
+          }
+        }
+      ],
+      "identityFields": [
+        "orderId",
+        "status"
+      ],
+      "ui": {
+        "category": "Sales",
+        "icon": "cart"
+      }
+    },
+    {
+      "type": "commerce.purchase.status-changed",
+      "version": "1.2.0",
+      "displayName": "Purchase status changed",
+      "localization": {
+        "ru": {
+          "displayName": "Изменился статус покупки"
+        },
+        "en": {
+          "displayName": "Purchase status changed"
+        }
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "closed",
+              "refunded",
+              "partially-refunded",
+              "unpaid"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "en"
+            ]
+          },
+          "buyer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "seller": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "chatId": {
+            "type": "unknown"
+          },
+          "title": {
+            "type": "string"
+          },
+          "fullDescription": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "price": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "usd",
+              "rub",
+              "eur",
+              "unknown"
+            ]
+          },
+          "lotId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "player": {
+            "type": "string"
+          },
+          "subcategory": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "common",
+                  "currency"
+                ]
+              },
+              "category": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "server": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "side": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "review": {
+            "type": "object",
+            "properties": {
+              "stars": {
+                "type": "number"
+              },
+              "text": {
+                "type": "string"
+              },
+              "reply": {
+                "type": "string"
+              },
+              "anonymous": {
+                "type": "boolean"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "author": {
+                "type": "string"
+              },
+              "authorId": {
+                "type": "number"
+              },
+              "byBot": {
+                "type": "boolean"
+              },
+              "replyByBot": {
+                "type": "boolean"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "lotFields": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "orderId",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "scopeSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "chatId": {
+            "type": "unknown"
+          },
+          "buyerId": {
+            "type": "number"
+          },
+          "buyerUsername": {
+            "type": "string"
+          },
+          "lotId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "chatId"
+        ],
+        "additionalProperties": false
+      },
+      "selectors": [
+        {
+          "id": "status",
+          "displayName": "New order status",
+          "localization": {
+            "ru": {
+              "displayName": "Новый статус заказа"
+            },
+            "en": {
+              "displayName": "New order status"
+            }
+          },
+          "source": "payload",
+          "path": "status",
+          "operators": [
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "lot-id",
+          "displayName": "Lot ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID лота"
+            },
+            "en": {
+              "displayName": "Lot ID"
+            }
+          },
+          "source": "scope",
+          "path": "lotId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "category-id",
+          "displayName": "Category ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID категории"
+            },
+            "en": {
+              "displayName": "Category ID"
+            }
+          },
+          "source": "scope",
+          "path": "categoryId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "order-id",
+          "displayName": "Order number",
+          "localization": {
+            "ru": {
+              "displayName": "Номер заказа"
+            },
+            "en": {
+              "displayName": "Order number"
+            }
+          },
+          "source": "payload",
+          "path": "orderId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "title",
+          "displayName": "Item name",
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          },
+          "source": "payload",
+          "path": "title",
+          "operators": [
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in",
+            "exists"
+          ]
+        },
+        {
+          "id": "buyer-username",
+          "displayName": "Buyer username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя покупателя"
+            },
+            "en": {
+              "displayName": "Buyer username"
+            }
+          },
+          "source": "scope",
+          "path": "buyerUsername",
+          "operators": [
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in",
+            "exists"
+          ]
+        },
+        {
+          "id": "currency-code",
+          "displayName": "Currency code",
+          "localization": {
+            "ru": {
+              "displayName": "Код валюты"
+            },
+            "en": {
+              "displayName": "Currency code"
+            }
+          },
+          "source": "payload",
+          "path": "currency",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        }
+      ],
+      "bindingFields": [
+        {
+          "id": "order-id",
+          "displayName": "Order number",
+          "localization": {
+            "ru": {
+              "displayName": "Номер заказа"
+            },
+            "en": {
+              "displayName": "Order number"
+            }
+          },
+          "source": "payload",
+          "path": "orderId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "recommended": true,
+          "availability": "always",
+          "category": "Order"
+        },
+        {
+          "id": "status",
+          "displayName": "Order status",
+          "localization": {
+            "ru": {
+              "displayName": "Статус заказа"
+            },
+            "en": {
+              "displayName": "Order status"
+            }
+          },
+          "source": "payload",
+          "path": "status",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "closed",
+              "refunded",
+              "partially-refunded",
+              "unpaid"
+            ]
+          },
+          "availability": "always",
+          "category": "Order"
+        },
+        {
+          "id": "created-at",
+          "displayName": "Created at",
+          "localization": {
+            "ru": {
+              "displayName": "Дата создания"
+            },
+            "en": {
+              "displayName": "Created at"
+            }
+          },
+          "source": "payload",
+          "path": "createdAt",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Order"
+        },
+        {
+          "id": "locale",
+          "displayName": "Order language code",
+          "localization": {
+            "ru": {
+              "displayName": "Код языка заказа"
+            },
+            "en": {
+              "displayName": "Order language code"
+            }
+          },
+          "source": "payload",
+          "path": "locale",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "en"
+            ]
+          },
+          "availability": "when-present",
+          "category": "Order"
+        },
+        {
+          "id": "item-title",
+          "displayName": "Item name",
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          },
+          "source": "payload",
+          "path": "title",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "full-description",
+          "displayName": "Full description",
+          "localization": {
+            "ru": {
+              "displayName": "Полное описание"
+            },
+            "en": {
+              "displayName": "Full description"
+            }
+          },
+          "source": "payload",
+          "path": "fullDescription",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "quantity",
+          "displayName": "Quantity",
+          "localization": {
+            "ru": {
+              "displayName": "Количество"
+            },
+            "en": {
+              "displayName": "Quantity"
+            }
+          },
+          "source": "payload",
+          "path": "quantity",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "price",
+          "displayName": "Order total",
+          "localization": {
+            "ru": {
+              "displayName": "Сумма заказа"
+            },
+            "en": {
+              "displayName": "Order total"
+            }
+          },
+          "source": "payload",
+          "path": "price",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "currency-code",
+          "displayName": "Currency code",
+          "localization": {
+            "ru": {
+              "displayName": "Код валюты"
+            },
+            "en": {
+              "displayName": "Currency code"
+            }
+          },
+          "source": "payload",
+          "path": "currency",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "usd",
+              "rub",
+              "eur",
+              "unknown"
+            ]
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "lot-id",
+          "displayName": "Lot ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID лота"
+            },
+            "en": {
+              "displayName": "Lot ID"
+            }
+          },
+          "source": "payload",
+          "path": "lotId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-id",
+          "displayName": "Category ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID категории"
+            },
+            "en": {
+              "displayName": "Category ID"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.id",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-name",
+          "displayName": "Category name",
+          "localization": {
+            "ru": {
+              "displayName": "Название категории"
+            },
+            "en": {
+              "displayName": "Category name"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-full-name",
+          "displayName": "Full category name",
+          "localization": {
+            "ru": {
+              "displayName": "Полное название категории"
+            },
+            "en": {
+              "displayName": "Full category name"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.fullName",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "category-type",
+          "displayName": "Category type",
+          "localization": {
+            "ru": {
+              "displayName": "Тип категории"
+            },
+            "en": {
+              "displayName": "Category type"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.type",
+          "valueSchema": {
+            "type": "string",
+            "enum": [
+              "common",
+              "currency"
+            ]
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "parent-category-id",
+          "displayName": "Parent category ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID родительской категории"
+            },
+            "en": {
+              "displayName": "Parent category ID"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.category.id",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "parent-category-name",
+          "displayName": "Parent category name",
+          "localization": {
+            "ru": {
+              "displayName": "Название родительской категории"
+            },
+            "en": {
+              "displayName": "Parent category name"
+            }
+          },
+          "source": "payload",
+          "path": "subcategory.category.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item"
+        },
+        {
+          "id": "lot-field",
+          "displayName": "Order field",
+          "localization": {
+            "ru": {
+              "displayName": "Поле заказа"
+            },
+            "en": {
+              "displayName": "Order field"
+            }
+          },
+          "source": "payload",
+          "path": "lotFields",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Item",
+          "keyed": {
+            "guardPath": "subcategory.id",
+            "guardParameter": "subcategoryId"
+          }
+        },
+        {
+          "id": "player",
+          "displayName": "Character name",
+          "localization": {
+            "ru": {
+              "displayName": "Имя персонажа"
+            },
+            "en": {
+              "displayName": "Character name"
+            }
+          },
+          "source": "payload",
+          "path": "player",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "server-id",
+          "displayName": "Server ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID сервера"
+            },
+            "en": {
+              "displayName": "Server ID"
+            }
+          },
+          "source": "payload",
+          "path": "server.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "server-name",
+          "displayName": "Server name",
+          "localization": {
+            "ru": {
+              "displayName": "Название сервера"
+            },
+            "en": {
+              "displayName": "Server name"
+            }
+          },
+          "source": "payload",
+          "path": "server.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "side-id",
+          "displayName": "Side ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID стороны"
+            },
+            "en": {
+              "displayName": "Side ID"
+            }
+          },
+          "source": "payload",
+          "path": "side.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "side-name",
+          "displayName": "Side name",
+          "localization": {
+            "ru": {
+              "displayName": "Название стороны"
+            },
+            "en": {
+              "displayName": "Side name"
+            }
+          },
+          "source": "payload",
+          "path": "side.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Game"
+        },
+        {
+          "id": "buyer-id",
+          "displayName": "Buyer ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID покупателя"
+            },
+            "en": {
+              "displayName": "Buyer ID"
+            }
+          },
+          "source": "payload",
+          "path": "buyer.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "buyer-username",
+          "displayName": "Buyer username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя покупателя"
+            },
+            "en": {
+              "displayName": "Buyer username"
+            }
+          },
+          "source": "payload",
+          "path": "buyer.username",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "seller-id",
+          "displayName": "Seller ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID продавца"
+            },
+            "en": {
+              "displayName": "Seller ID"
+            }
+          },
+          "source": "payload",
+          "path": "seller.id",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "seller-username",
+          "displayName": "Seller username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя продавца"
+            },
+            "en": {
+              "displayName": "Seller username"
+            }
+          },
+          "source": "payload",
+          "path": "seller.username",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "People"
+        },
+        {
+          "id": "review-stars",
+          "displayName": "Review stars",
+          "localization": {
+            "ru": {
+              "displayName": "Оценка отзыва"
+            },
+            "en": {
+              "displayName": "Review stars"
+            }
+          },
+          "source": "payload",
+          "path": "review.stars",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-text",
+          "displayName": "Review text",
+          "localization": {
+            "ru": {
+              "displayName": "Текст отзыва"
+            },
+            "en": {
+              "displayName": "Review text"
+            }
+          },
+          "source": "payload",
+          "path": "review.text",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-reply",
+          "displayName": "Review reply",
+          "localization": {
+            "ru": {
+              "displayName": "Ответ на отзыв"
+            },
+            "en": {
+              "displayName": "Review reply"
+            }
+          },
+          "source": "payload",
+          "path": "review.reply",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-anonymous",
+          "displayName": "Anonymous review",
+          "localization": {
+            "ru": {
+              "displayName": "Анонимный отзыв"
+            },
+            "en": {
+              "displayName": "Anonymous review"
+            }
+          },
+          "source": "payload",
+          "path": "review.anonymous",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-hidden",
+          "displayName": "Hidden review",
+          "localization": {
+            "ru": {
+              "displayName": "Отзыв скрыт"
+            },
+            "en": {
+              "displayName": "Hidden review"
+            }
+          },
+          "source": "payload",
+          "path": "review.hidden",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-author",
+          "displayName": "Review author",
+          "localization": {
+            "ru": {
+              "displayName": "Автор отзыва"
+            },
+            "en": {
+              "displayName": "Review author"
+            }
+          },
+          "source": "payload",
+          "path": "review.author",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-author-id",
+          "displayName": "Review author ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID автора отзыва"
+            },
+            "en": {
+              "displayName": "Review author ID"
+            }
+          },
+          "source": "payload",
+          "path": "review.authorId",
+          "valueSchema": {
+            "type": "number"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-by-bot",
+          "displayName": "Review added by bot",
+          "localization": {
+            "ru": {
+              "displayName": "Отзыв добавлен ботом"
+            },
+            "en": {
+              "displayName": "Review added by bot"
+            }
+          },
+          "source": "payload",
+          "path": "review.byBot",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        },
+        {
+          "id": "review-reply-by-bot",
+          "displayName": "Review reply added by bot",
+          "localization": {
+            "ru": {
+              "displayName": "Ответ на отзыв добавлен ботом"
+            },
+            "en": {
+              "displayName": "Review reply added by bot"
+            }
+          },
+          "source": "payload",
+          "path": "review.replyByBot",
+          "valueSchema": {
+            "type": "boolean"
+          },
+          "availability": "when-present",
+          "category": "Review"
+        }
+      ],
+      "identityFields": [
+        "orderId",
+        "status"
+      ],
+      "ui": {
+        "category": "Sales",
+        "icon": "order"
+      }
+    },
+    {
+      "type": "messaging.message.received",
+      "version": "1.0.0",
+      "displayName": "Message received",
+      "localization": {
+        "ru": {
+          "displayName": "Получено сообщение",
+          "description": "Запускается при новом сообщении покупателя."
+        },
+        "en": {
+          "displayName": "Message received",
+          "description": "Starts when a buyer sends a new message."
+        }
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "number"
+          },
+          "chatId": {
+            "type": "unknown"
+          },
+          "text": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "messageId",
+          "chatId",
+          "text",
+          "author"
+        ],
+        "additionalProperties": false
+      },
+      "scopeSchema": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "unknown"
+          },
+          "orderId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chatId"
+        ],
+        "additionalProperties": false
+      },
+      "selectors": [
+        {
+          "id": "message",
+          "displayName": "Message text",
+          "localization": {
+            "ru": {
+              "displayName": "Текст сообщения"
+            },
+            "en": {
+              "displayName": "Message text"
+            }
+          },
+          "source": "payload",
+          "path": "text",
+          "operators": [
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in",
+            "exists"
+          ]
+        },
+        {
+          "id": "sender-username",
+          "displayName": "Sender username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя отправителя"
+            },
+            "en": {
+              "displayName": "Sender username"
+            }
+          },
+          "source": "payload",
+          "path": "author.username",
+          "operators": [
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in",
+            "exists"
+          ]
+        },
+        {
+          "id": "order-id",
+          "displayName": "Order number",
+          "localization": {
+            "ru": {
+              "displayName": "Номер заказа"
+            },
+            "en": {
+              "displayName": "Order number"
+            }
+          },
+          "source": "scope",
+          "path": "orderId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        }
+      ],
+      "bindingFields": [
+        {
+          "id": "message-text",
+          "displayName": "Message text",
+          "localization": {
+            "ru": {
+              "displayName": "Текст сообщения"
+            },
+            "en": {
+              "displayName": "Message text"
+            }
+          },
+          "source": "payload",
+          "path": "text",
+          "valueSchema": {
+            "type": "string"
+          },
+          "recommended": true,
+          "availability": "always"
+        },
+        {
+          "id": "sender-username",
+          "displayName": "Sender username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя пользователя отправителя"
+            },
+            "en": {
+              "displayName": "Sender username"
+            }
+          },
+          "source": "payload",
+          "path": "author.username",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present"
+        },
+        {
+          "id": "order-context",
+          "displayName": "Order number",
+          "localization": {
+            "ru": {
+              "displayName": "Номер заказа"
+            },
+            "en": {
+              "displayName": "Order number"
+            }
+          },
+          "source": "scope",
+          "path": "orderId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "availability": "when-present"
+        }
+      ],
+      "inputResolvers": [
+        {
+          "id": "funpay.cardinal.collect-input",
+          "version": "1.0.0",
+          "abstractionId": "messaging.collect-input",
+          "abstractionVersion": "1.1.0",
+          "displayName": "Ask buyer",
+          "description": "Asks the buyer for a value and lets Buywell validate every response.",
+          "localization": {
+            "ru": {
+              "displayName": "Спросить покупателя",
+              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
+            },
+            "en": {
+              "displayName": "Ask buyer",
+              "description": "Asks in the current chat and sends responses to Buywell for validation."
+            }
+          },
+          "outputSchema": {
+            "type": "unknown"
+          },
+          "parameterSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "invalidResponse": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "validator": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "timeoutSeconds": {
+                "type": "integer"
+              },
+              "maxInvalidAttempts": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "prompt",
+              "invalidResponse",
+              "validator"
+            ],
+            "additionalProperties": false
+          },
+          "mode": "deferred",
+          "sensitive": true,
+          "requiredContext": [
+            {
+              "source": "scope",
+              "path": "chatId"
+            }
+          ],
+          "ui": {
+            "category": "Messaging",
+            "order": 10,
+            "recommended": true
+          }
+        }
+      ],
+      "identityFields": [
+        "messageId"
+      ],
+      "ui": {
+        "category": "Messages",
+        "icon": "message"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "type": "funpay.cardinal/send-message",
+      "version": "1.0.0",
+      "kind": "action",
+      "displayName": "Send message",
+      "description": "Sends a message to the chat associated with the current event.",
+      "localization": {
+        "ru": {
+          "displayName": "Отправить сообщение",
+          "description": "Отправляет сообщение в чат, из которого запущен сценарий."
+        },
+        "en": {
+          "displayName": "Send message",
+          "description": "Sends a message to the chat that started the workflow."
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "requiredEventContext": [
+        {
+          "eventType": "commerce.purchase.created",
+          "eventVersion": "1.2.0",
+          "source": "scope",
+          "path": "chatId"
+        },
+        {
+          "eventType": "commerce.purchase.status-changed",
+          "eventVersion": "1.2.0",
+          "source": "scope",
+          "path": "chatId"
+        },
+        {
+          "eventType": "messaging.message.received",
+          "eventVersion": "1.0.0",
+          "source": "scope",
+          "path": "chatId"
+        }
+      ],
+      "configSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "ui": {
+        "category": "Messages",
+        "icon": "message"
+      }
+    }
+  ],
+  "abstractions": [
+    {
+      "abstractionId": "messaging.send-in-context",
+      "abstractionVersion": "1.0.0",
+      "nodeType": "funpay.cardinal/send-message",
+      "nodeVersion": "1.0.0"
+    }
+  ]
+}

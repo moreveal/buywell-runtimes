@@ -1,0 +1,14 @@
+{
+  "buywell_url": "https://buywell.pro/api",
+  "connection_token": "bwapi_replace_with_your_connection_key",
+  "seller_id": 1234567,
+  "api_key": "replace_with_your_ggsel_api_key",
+  "ggsel_api_url": "https://seller.ggsel.com/api_sellers/api",
+  "database_path": "state/ggsel-runtime.sqlite3",
+  "poll_interval_seconds": 30,
+  "message_poll_interval_seconds": 10,
+  "sales_window": 100,
+  "request_timeout_seconds": 30,
+  "emit_existing_on_first_start": false,
+  "log_level": "INFO"
+}

@@ -1,0 +1,603 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "1.0.0",
+  "module": {
+    "id": "ggsel.seller",
+    "version": "1.0.0",
+    "displayName": "GGSel Seller",
+    "description": "Передаёт покупки и сообщения GGSel в сценарии Buywell и отправляет ответы покупателям.",
+    "publisher": "Buywell",
+    "supportedPlatforms": [
+      "GGSel"
+    ],
+    "documentation": {
+      "homepageUrl": "https://github.com/moreveal/buywell-runtimes/tree/main/ggsel",
+      "sourceUrl": "https://github.com/moreveal/buywell-runtimes"
+    }
+  },
+  "package": {
+    "branding": {
+      "icon": "assets/ggsel-square-icon.png"
+    },
+    "artifact": {
+      "path": "runtime/ggsel_runtime.py",
+      "filename": "ggsel_runtime.py"
+    },
+    "guides": {
+      "installation": {
+        "ru": "guides/install.ru.md",
+        "en": "guides/install.en.md"
+      },
+      "readme": {
+        "ru": "guides/README.ru.md",
+        "en": "guides/README.en.md"
+      },
+      "changelog": {
+        "ru": "guides/CHANGELOG.ru.md",
+        "en": "guides/CHANGELOG.en.md"
+      }
+    },
+    "compatibility": {
+      "environments": [
+        "Windows 10/11 with Python 3.11+",
+        "Linux with Python 3.11+"
+      ]
+    },
+    "release": {
+      "critical": false
+    }
+  },
+  "events": [
+    {
+      "type": "commerce.purchase.created",
+      "version": "1.0.0",
+      "displayName": "Purchase received",
+      "description": "Starts when the runtime finds a new paid GGSel purchase.",
+      "localization": {
+        "ru": {
+          "displayName": "Получена покупка",
+          "description": "Запускается, когда runtime находит новую оплаченную покупку GGSel."
+        },
+        "en": {
+          "displayName": "Purchase received",
+          "description": "Starts when the runtime finds a new paid GGSel purchase."
+        }
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "amountRub": {
+            "type": "number"
+          },
+          "amountUsd": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "profit": {
+            "type": "number"
+          },
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "contentId": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "buyer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "unknown"
+              },
+              "email": {
+                "type": "string"
+              },
+              "account": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "options": {
+            "type": "unknown"
+          }
+        },
+        "required": [
+          "invoiceId",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "scopeSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "chatId": {
+            "type": "integer"
+          },
+          "sellerId": {
+            "type": "integer"
+          },
+          "productId": {
+            "type": "integer"
+          },
+          "buyerEmail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "invoiceId",
+          "chatId",
+          "sellerId"
+        ],
+        "additionalProperties": false
+      },
+      "selectors": [
+        {
+          "id": "invoice-id",
+          "displayName": "Invoice ID",
+          "source": "scope",
+          "path": "invoiceId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "product-id",
+          "displayName": "Product ID",
+          "source": "scope",
+          "path": "productId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        },
+        {
+          "id": "buyer-email",
+          "displayName": "Buyer email",
+          "source": "scope",
+          "path": "buyerEmail",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in"
+          ]
+        }
+      ],
+      "bindingFields": [
+        {
+          "id": "invoice-id",
+          "source": "payload",
+          "path": "invoiceId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Invoice ID",
+          "localization": {
+            "ru": {
+              "displayName": "Номер покупки"
+            },
+            "en": {
+              "displayName": "Invoice ID"
+            }
+          },
+          "category": "Purchase",
+          "order": 10,
+          "recommended": true,
+          "availability": "always"
+        },
+        {
+          "id": "status",
+          "source": "payload",
+          "path": "status",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Purchase status",
+          "localization": {
+            "ru": {
+              "displayName": "Статус покупки"
+            },
+            "en": {
+              "displayName": "Purchase status"
+            }
+          },
+          "category": "Purchase",
+          "order": 20,
+          "availability": "always"
+        },
+        {
+          "id": "product-name",
+          "source": "payload",
+          "path": "product.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Product name",
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Product name"
+            }
+          },
+          "category": "Product",
+          "order": 30,
+          "availability": "when-present"
+        },
+        {
+          "id": "amount",
+          "source": "payload",
+          "path": "amount",
+          "valueSchema": {
+            "type": "number"
+          },
+          "displayName": "Amount",
+          "localization": {
+            "ru": {
+              "displayName": "Сумма"
+            },
+            "en": {
+              "displayName": "Amount"
+            }
+          },
+          "category": "Purchase",
+          "order": 40,
+          "availability": "when-present"
+        },
+        {
+          "id": "currency",
+          "source": "payload",
+          "path": "currency",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Currency",
+          "localization": {
+            "ru": {
+              "displayName": "Валюта"
+            },
+            "en": {
+              "displayName": "Currency"
+            }
+          },
+          "category": "Purchase",
+          "order": 50,
+          "availability": "when-present"
+        },
+        {
+          "id": "buyer-email",
+          "source": "payload",
+          "path": "buyer.email",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Buyer email",
+          "localization": {
+            "ru": {
+              "displayName": "Email покупателя"
+            },
+            "en": {
+              "displayName": "Buyer email"
+            }
+          },
+          "category": "Buyer",
+          "order": 60,
+          "availability": "when-present",
+          "sensitive": true
+        },
+        {
+          "id": "options",
+          "source": "payload",
+          "path": "options",
+          "valueSchema": {
+            "type": "unknown"
+          },
+          "displayName": "Purchase options",
+          "localization": {
+            "ru": {
+              "displayName": "Параметры покупки"
+            },
+            "en": {
+              "displayName": "Purchase options"
+            }
+          },
+          "category": "Purchase",
+          "order": 70,
+          "availability": "when-present"
+        }
+      ],
+      "identityFields": [
+        "invoiceId"
+      ],
+      "ui": {
+        "category": "Sales",
+        "icon": "cart"
+      }
+    },
+    {
+      "type": "messaging.message.received",
+      "version": "1.0.0",
+      "displayName": "Message received",
+      "description": "Starts when a buyer sends a new GGSel message.",
+      "localization": {
+        "ru": {
+          "displayName": "Получено сообщение",
+          "description": "Запускается при новом сообщении покупателя в GGSel."
+        },
+        "en": {
+          "displayName": "Message received",
+          "description": "Starts when a buyer sends a new GGSel message."
+        }
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string"
+          },
+          "chatId": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "previewUrl": {
+                "type": "string"
+              },
+              "isImage": {
+                "type": "boolean"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "messageId",
+          "chatId",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "scopeSchema": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "integer"
+          },
+          "invoiceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chatId",
+          "invoiceId"
+        ],
+        "additionalProperties": false
+      },
+      "selectors": [
+        {
+          "id": "message",
+          "displayName": "Message text",
+          "source": "payload",
+          "path": "text",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "in"
+          ]
+        },
+        {
+          "id": "invoice-id",
+          "displayName": "Invoice ID",
+          "source": "scope",
+          "path": "invoiceId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ]
+        }
+      ],
+      "bindingFields": [
+        {
+          "id": "message-text",
+          "source": "payload",
+          "path": "text",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Message text",
+          "localization": {
+            "ru": {
+              "displayName": "Текст сообщения"
+            },
+            "en": {
+              "displayName": "Message text"
+            }
+          },
+          "order": 10,
+          "recommended": true,
+          "availability": "always"
+        },
+        {
+          "id": "invoice-id",
+          "source": "scope",
+          "path": "invoiceId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Invoice ID",
+          "localization": {
+            "ru": {
+              "displayName": "Номер покупки"
+            },
+            "en": {
+              "displayName": "Invoice ID"
+            }
+          },
+          "order": 20,
+          "availability": "always"
+        },
+        {
+          "id": "file-url",
+          "source": "payload",
+          "path": "file.url",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "File URL",
+          "localization": {
+            "ru": {
+              "displayName": "Ссылка на файл"
+            },
+            "en": {
+              "displayName": "File URL"
+            }
+          },
+          "order": 30,
+          "availability": "when-present"
+        }
+      ],
+      "identityFields": [
+        "messageId",
+        "chatId"
+      ],
+      "ui": {
+        "category": "Messages",
+        "icon": "message"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "type": "ggsel.seller/send-message",
+      "version": "1.0.0",
+      "kind": "action",
+      "displayName": "Send message",
+      "description": "Sends a message to the GGSel chat associated with the current event.",
+      "localization": {
+        "ru": {
+          "displayName": "Отправить сообщение",
+          "description": "Отправляет сообщение в чат GGSel, из которого запущен сценарий."
+        },
+        "en": {
+          "displayName": "Send message",
+          "description": "Sends a message to the GGSel chat that started the workflow."
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "configSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "requiredEventContext": [
+        {
+          "eventType": "commerce.purchase.created",
+          "eventVersion": "1.0.0",
+          "source": "scope",
+          "path": "chatId"
+        },
+        {
+          "eventType": "messaging.message.received",
+          "eventVersion": "1.0.0",
+          "source": "scope",
+          "path": "chatId"
+        }
+      ],
+      "retryPolicy": {
+        "maxAttempts": 3,
+        "initialBackoffMs": 2000,
+        "maxBackoffMs": 30000
+      },
+      "ui": {
+        "category": "Messages",
+        "icon": "message"
+      }
+    }
+  ],
+  "abstractions": [
+    {
+      "abstractionId": "messaging.send-in-context",
+      "abstractionVersion": "1.0.0",
+      "nodeType": "ggsel.seller/send-message",
+      "nodeVersion": "1.0.0"
+    }
+  ]
+}
