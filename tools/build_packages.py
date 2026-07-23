@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_DIRECTORIES = ("ggsel", "funpay-cardinal")
+PACKAGE_DIRECTORIES = ("ggsel", "funpay-cardinal", "playerok-universal")
 FIXED_TIME = (2020, 1, 1, 0, 0, 0)
 RUNTIME_BUNDLES = {
     "ggsel": [
@@ -24,6 +24,15 @@ RUNTIME_BUNDLES = {
         "requirements.txt",
         "run.bat",
         "run.sh",
+    ],
+    "playerok-universal": [
+        "buywell_playerok/__init__.py",
+        "buywell_playerok/bridge.py",
+        "buywell_playerok/config.py",
+        "buywell_playerok/meta.py",
+        "buywell_playerok/requirements.txt",
+        "buywell_playerok/state.py",
+        "buywell_playerok/telegram_ui.py",
     ],
 }
 
@@ -84,6 +93,16 @@ def build(directory: Path, output_directory: Path) -> Path:
     artifact_path = manifest["package"]["artifact"]["path"]
     runtime_bundle = _runtime_bundle(directory)
     package_files = _referenced_files(manifest)
+    assets_directory = directory / "assets"
+    if assets_directory.is_dir():
+        package_files = sorted(
+            set(package_files)
+            | {
+                path.relative_to(directory).as_posix()
+                for path in assets_directory.rglob("*")
+                if path.is_file()
+            }
+        )
     entries: list[tuple[str, Path | bytes]] = [("manifest.json", manifest_path)]
     for path in package_files:
         entries.append(

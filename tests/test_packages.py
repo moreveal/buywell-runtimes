@@ -30,15 +30,17 @@ class PackageTests(unittest.TestCase):
                 self.assertTrue((directory / relative).is_file(), f"{name}: {relative}")
             artifact_path = manifest["package"]["artifact"]["path"]
             if name == "ggsel":
-                runtime_text = (directory / "runtime" / "ggsel_runtime.py").read_text(
-                    encoding="utf-8"
-                )
+                runtime_file = directory / "runtime" / "ggsel_runtime.py"
+                constant = "MODULE_VERSION"
+            elif name == "playerok-universal":
+                runtime_file = directory / "runtime" / "buywell_playerok" / "bridge.py"
+                constant = "MODULE_VERSION"
             else:
-                runtime_text = (directory / artifact_path).read_text(encoding="utf-8")
+                runtime_file = directory / artifact_path
+                constant = "VERSION"
+            runtime_text = runtime_file.read_text(encoding="utf-8")
             self.assertIn(
-                f'MODULE_VERSION = "{manifest["module"]["version"]}"'
-                if name == "ggsel"
-                else f'VERSION = "{manifest["module"]["version"]}"',
+                f'{constant} = "{manifest["module"]["version"]}"',
                 runtime_text,
             )
 
@@ -83,6 +85,41 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(event["bindingCatalogs"][0]["id"], "funpay.categories")
             self.assertEqual(event["bindingCatalogs"][0]["scope"]["selectorId"], "category-id")
 
+    def test_playerok_1_0_4_offers_human_readable_conditions_and_category_matrix(self):
+        manifest = json.loads(
+            (ROOT / "playerok-universal" / "manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(manifest["module"]["version"], "1.0.4")
+        events = {event["type"]: event for event in manifest["events"]}
+        self.assertEqual(
+            [selector["id"] for selector in events["messaging.message.received"]["selectors"][:5]],
+            [
+                "message-text",
+                "sender-username",
+                "item-name",
+                "game-name",
+                "category-name",
+            ],
+        )
+        self.assertEqual(
+            [selector["id"] for selector in events["commerce.purchase.created"]["selectors"][:6]],
+            [
+                "item-name",
+                "buyer-username",
+                "game-name",
+                "category-name",
+                "obtaining-type",
+                "item-price",
+            ],
+        )
+        for event in events.values():
+            catalog = event["bindingCatalogs"][0]
+            self.assertEqual(catalog["id"], "playerok.categories")
+            self.assertEqual(catalog["scope"]["selectorId"], "category-id")
+            self.assertEqual(catalog["scope"]["guardParameter"], "categoryId")
+
     def test_ggsel_changelogs_date_every_release(self):
         for locale in ("ru", "en"):
             text = (ROOT / "ggsel" / "guides" / f"CHANGELOG.{locale}.md").read_text(encoding="utf-8")
@@ -115,6 +152,30 @@ class PackageTests(unittest.TestCase):
                 self.assertTrue(runtime.getinfo("install.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("install-service.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("run.sh").external_attr >> 16 & 0o111)
+
+    def test_playerok_package_contains_embedded_module_and_catalog_assets(self):
+        with tempfile.TemporaryDirectory() as output:
+            package = build_packages.build(ROOT / "playerok-universal", Path(output))
+            with zipfile.ZipFile(package) as archive:
+                names = archive.namelist()
+                runtime_archive = archive.read(
+                    "runtime/playerok-universal-runtime-1.0.4.zip"
+                )
+            self.assertIn("assets/playerok-banner.jpg", names)
+            self.assertIn("assets/playerok-icon.png", names)
+            with zipfile.ZipFile(BytesIO(runtime_archive)) as runtime:
+                self.assertEqual(
+                    runtime.namelist(),
+                    sorted(build_packages.RUNTIME_BUNDLES["playerok-universal"]),
+                )
+                self.assertIn(
+                    b'MODULE_VERSION = "1.0.4"',
+                    runtime.read("buywell_playerok/bridge.py"),
+                )
+                self.assertIn(
+                    b"ItemStatuses.DRAFT",
+                    runtime.read("buywell_playerok/bridge.py"),
+                )
 
 
 if __name__ == "__main__":

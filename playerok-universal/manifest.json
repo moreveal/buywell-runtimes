@@ -1,0 +1,1184 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "1.0.0",
+  "module": {
+    "id": "playerok.universal",
+    "version": "1.0.4",
+    "displayName": "Playerok Universal",
+    "description": "Передаёт продажи и сообщения Playerok в сценарии Buywell и отправляет ответы покупателям.",
+    "publisher": "Buywell",
+    "supportedPlatforms": [
+      "Playerok Universal",
+      "Playerok"
+    ],
+    "documentation": {
+      "homepageUrl": "https://github.com/moreveal/buywell-runtimes/tree/main/playerok-universal",
+      "sourceUrl": "https://github.com/moreveal/buywell-runtimes"
+    }
+  },
+  "package": {
+    "branding": {
+      "icon": "assets/playerok-icon.png"
+    },
+    "artifact": {
+      "path": "runtime/playerok-universal-runtime-1.0.4.zip",
+      "filename": "playerok-universal-runtime-1.0.4.zip"
+    },
+    "guides": {
+      "installation": {
+        "ru": "guides/install.ru.md",
+        "en": "guides/install.en.md"
+      },
+      "readme": {
+        "ru": "guides/README.ru.md",
+        "en": "guides/README.en.md"
+      },
+      "changelog": {
+        "ru": "guides/CHANGELOG.ru.md",
+        "en": "guides/CHANGELOG.en.md"
+      }
+    },
+    "compatibility": {
+      "environments": [
+        "Playerok Universal 1.13.9+ with Python 3.12"
+      ]
+    },
+    "release": {
+      "critical": false
+    }
+  },
+  "events": [
+    {
+      "type": "commerce.purchase.created",
+      "version": "1.0.0",
+      "displayName": "Purchase received",
+      "description": "Starts when Playerok Universal detects a new paid sale.",
+      "localization": {
+        "ru": {
+          "displayName": "Получена покупка",
+          "description": "Запускается, когда Playerok Universal обнаруживает новую оплаченную продажу."
+        },
+        "en": {
+          "displayName": "Purchase received",
+          "description": "Starts when Playerok Universal detects a new paid sale."
+        }
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "dealId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "price": {
+                "type": "number"
+              },
+              "gameId": {
+                "type": "string"
+              },
+              "gameName": {
+                "type": "string"
+              },
+              "categoryId": {
+                "type": "string"
+              },
+              "categoryName": {
+                "type": "string"
+              },
+              "obtainingTypeId": {
+                "type": "string"
+              },
+              "obtainingTypeName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "buyer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "fieldValues": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "fieldChoiceIds": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "dealId",
+          "status",
+          "createdAt",
+          "item",
+          "buyer",
+          "fieldValues",
+          "fieldChoiceIds"
+        ],
+        "additionalProperties": false
+      },
+      "scopeSchema": {
+        "type": "object",
+        "properties": {
+          "dealId": {
+            "type": "string"
+          },
+          "chatId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string"
+          },
+          "buyerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dealId",
+          "chatId",
+          "itemId"
+        ],
+        "additionalProperties": false
+      },
+      "selectors": [
+        {
+          "id": "item-name",
+          "displayName": "Item name",
+          "source": "payload",
+          "path": "item.name",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          }
+        },
+        {
+          "id": "buyer-username",
+          "displayName": "Buyer username",
+          "source": "payload",
+          "path": "buyer.username",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Имя покупателя"
+            },
+            "en": {
+              "displayName": "Buyer username"
+            }
+          }
+        },
+        {
+          "id": "game-name",
+          "displayName": "Game name",
+          "source": "payload",
+          "path": "item.gameName",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Название игры"
+            },
+            "en": {
+              "displayName": "Game name"
+            }
+          }
+        },
+        {
+          "id": "category-name",
+          "displayName": "Category name",
+          "source": "payload",
+          "path": "item.categoryName",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Название категории"
+            },
+            "en": {
+              "displayName": "Category name"
+            }
+          }
+        },
+        {
+          "id": "obtaining-type",
+          "displayName": "Delivery method",
+          "source": "payload",
+          "path": "item.obtainingTypeName",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Способ получения"
+            },
+            "en": {
+              "displayName": "Delivery method"
+            }
+          }
+        },
+        {
+          "id": "item-price",
+          "displayName": "Item price",
+          "source": "payload",
+          "path": "item.price",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Цена товара"
+            },
+            "en": {
+              "displayName": "Item price"
+            }
+          }
+        },
+        {
+          "id": "deal-id",
+          "displayName": "Deal ID",
+          "source": "scope",
+          "path": "dealId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID сделки"
+            },
+            "en": {
+              "displayName": "Deal ID"
+            }
+          }
+        },
+        {
+          "id": "item-id",
+          "displayName": "Item ID",
+          "source": "scope",
+          "path": "itemId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID товара"
+            },
+            "en": {
+              "displayName": "Item ID"
+            }
+          }
+        },
+        {
+          "id": "category-id",
+          "displayName": "Category ID",
+          "source": "scope",
+          "path": "categoryId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID категории"
+            },
+            "en": {
+              "displayName": "Category ID"
+            }
+          }
+        },
+        {
+          "id": "game-id",
+          "displayName": "Game ID",
+          "source": "scope",
+          "path": "gameId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID игры"
+            },
+            "en": {
+              "displayName": "Game ID"
+            }
+          }
+        },
+        {
+          "id": "buyer-id",
+          "displayName": "Buyer ID",
+          "source": "scope",
+          "path": "buyerId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID покупателя"
+            },
+            "en": {
+              "displayName": "Buyer ID"
+            }
+          }
+        }
+      ],
+      "bindingFields": [
+        {
+          "id": "deal-id",
+          "source": "payload",
+          "path": "dealId",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Deal ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID сделки"
+            },
+            "en": {
+              "displayName": "Deal ID"
+            }
+          },
+          "category": "Purchase",
+          "order": 10,
+          "recommended": true,
+          "availability": "always"
+        },
+        {
+          "id": "item-name",
+          "source": "payload",
+          "path": "item.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Item name",
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          },
+          "category": "Item",
+          "order": 20,
+          "availability": "when-present"
+        },
+        {
+          "id": "item-price",
+          "source": "payload",
+          "path": "item.price",
+          "valueSchema": {
+            "type": "number"
+          },
+          "displayName": "Item price",
+          "localization": {
+            "ru": {
+              "displayName": "Цена товара"
+            },
+            "en": {
+              "displayName": "Item price"
+            }
+          },
+          "category": "Item",
+          "order": 30,
+          "availability": "when-present"
+        },
+        {
+          "id": "buyer-username",
+          "source": "payload",
+          "path": "buyer.username",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Buyer username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя покупателя"
+            },
+            "en": {
+              "displayName": "Buyer username"
+            }
+          },
+          "category": "Buyer",
+          "order": 40,
+          "availability": "when-present"
+        },
+        {
+          "id": "field-value",
+          "source": "payload",
+          "path": "fieldValues",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Order field value",
+          "localization": {
+            "ru": {
+              "displayName": "Значение поля заказа"
+            },
+            "en": {
+              "displayName": "Order field value"
+            }
+          },
+          "category": "Order fields",
+          "order": 50,
+          "availability": "when-present",
+          "keyed": {
+            "guardPath": "item.categoryId",
+            "guardParameter": "categoryId"
+          }
+        },
+        {
+          "id": "field-choice-id",
+          "source": "payload",
+          "path": "fieldChoiceIds",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Order field choice ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID варианта поля заказа"
+            },
+            "en": {
+              "displayName": "Order field choice ID"
+            }
+          },
+          "category": "Order fields",
+          "order": 60,
+          "availability": "when-present",
+          "keyed": {
+            "guardPath": "item.categoryId",
+            "guardParameter": "categoryId"
+          }
+        }
+      ],
+      "bindingCatalogs": [
+        {
+          "id": "playerok.categories",
+          "version": "1.0.0",
+          "displayName": "Playerok categories",
+          "localization": {
+            "ru": {
+              "displayName": "Категории Playerok"
+            },
+            "en": {
+              "displayName": "Playerok categories"
+            }
+          },
+          "scope": {
+            "displayName": "Category",
+            "localization": {
+              "ru": {
+                "displayName": "Категория"
+              },
+              "en": {
+                "displayName": "Category"
+              }
+            },
+            "selectorId": "category-id",
+            "guardParameter": "categoryId"
+          },
+          "valueFieldId": "field-value",
+          "choiceFieldId": "field-choice-id"
+        }
+      ],
+      "identityFields": [
+        "dealId"
+      ],
+      "ui": {
+        "category": "Purchases",
+        "icon": "shopping-bag"
+      }
+    },
+    {
+      "type": "messaging.message.received",
+      "version": "1.0.0",
+      "displayName": "Message received",
+      "description": "Starts when a customer sends a message in Playerok.",
+      "localization": {
+        "ru": {
+          "displayName": "Получено сообщение",
+          "description": "Запускается, когда клиент отправляет сообщение в Playerok."
+        },
+        "en": {
+          "displayName": "Message received",
+          "description": "Starts when a customer sends a message in Playerok."
+        }
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sender": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "price": {
+                "type": "number"
+              },
+              "gameId": {
+                "type": "string"
+              },
+              "gameName": {
+                "type": "string"
+              },
+              "categoryId": {
+                "type": "string"
+              },
+              "categoryName": {
+                "type": "string"
+              },
+              "obtainingTypeId": {
+                "type": "string"
+              },
+              "obtainingTypeName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "fieldValues": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "fieldChoiceIds": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "messageId",
+          "text",
+          "createdAt",
+          "images",
+          "sender",
+          "fieldValues",
+          "fieldChoiceIds"
+        ],
+        "additionalProperties": false
+      },
+      "scopeSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string"
+          },
+          "chatId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string"
+          },
+          "buyerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "messageId",
+          "chatId"
+        ],
+        "additionalProperties": false
+      },
+      "selectors": [
+        {
+          "id": "message-text",
+          "displayName": "Message text",
+          "source": "payload",
+          "path": "text",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Текст сообщения"
+            },
+            "en": {
+              "displayName": "Message text"
+            }
+          }
+        },
+        {
+          "id": "sender-username",
+          "displayName": "Sender username",
+          "source": "payload",
+          "path": "sender.username",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Имя отправителя"
+            },
+            "en": {
+              "displayName": "Sender username"
+            }
+          }
+        },
+        {
+          "id": "item-name",
+          "displayName": "Item name",
+          "source": "payload",
+          "path": "item.name",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          }
+        },
+        {
+          "id": "game-name",
+          "displayName": "Game name",
+          "source": "payload",
+          "path": "item.gameName",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Название игры"
+            },
+            "en": {
+              "displayName": "Game name"
+            }
+          }
+        },
+        {
+          "id": "category-name",
+          "displayName": "Category name",
+          "source": "payload",
+          "path": "item.categoryName",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in",
+            "contains",
+            "starts-with",
+            "ends-with",
+            "matches"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "Название категории"
+            },
+            "en": {
+              "displayName": "Category name"
+            }
+          }
+        },
+        {
+          "id": "message-id",
+          "displayName": "Message ID",
+          "source": "scope",
+          "path": "messageId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID сообщения"
+            },
+            "en": {
+              "displayName": "Message ID"
+            }
+          }
+        },
+        {
+          "id": "chat-id",
+          "displayName": "Chat ID",
+          "source": "scope",
+          "path": "chatId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID чата"
+            },
+            "en": {
+              "displayName": "Chat ID"
+            }
+          }
+        },
+        {
+          "id": "item-id",
+          "displayName": "Item ID",
+          "source": "scope",
+          "path": "itemId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID товара"
+            },
+            "en": {
+              "displayName": "Item ID"
+            }
+          }
+        },
+        {
+          "id": "category-id",
+          "displayName": "Category ID",
+          "source": "scope",
+          "path": "categoryId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID категории"
+            },
+            "en": {
+              "displayName": "Category ID"
+            }
+          }
+        },
+        {
+          "id": "game-id",
+          "displayName": "Game ID",
+          "source": "scope",
+          "path": "gameId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID игры"
+            },
+            "en": {
+              "displayName": "Game ID"
+            }
+          }
+        },
+        {
+          "id": "buyer-id",
+          "displayName": "Sender ID",
+          "source": "scope",
+          "path": "buyerId",
+          "operators": [
+            "exists",
+            "equals",
+            "not-equals",
+            "in"
+          ],
+          "localization": {
+            "ru": {
+              "displayName": "ID отправителя"
+            },
+            "en": {
+              "displayName": "Sender ID"
+            }
+          }
+        }
+      ],
+      "bindingFields": [
+        {
+          "id": "message-text",
+          "source": "payload",
+          "path": "text",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Message text",
+          "localization": {
+            "ru": {
+              "displayName": "Текст сообщения"
+            },
+            "en": {
+              "displayName": "Message text"
+            }
+          },
+          "category": "Message",
+          "order": 10,
+          "recommended": true,
+          "availability": "always"
+        },
+        {
+          "id": "sender-username",
+          "source": "payload",
+          "path": "sender.username",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Sender username",
+          "localization": {
+            "ru": {
+              "displayName": "Имя отправителя"
+            },
+            "en": {
+              "displayName": "Sender username"
+            }
+          },
+          "category": "Sender",
+          "order": 20,
+          "availability": "when-present"
+        },
+        {
+          "id": "item-name",
+          "source": "payload",
+          "path": "item.name",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Item name",
+          "localization": {
+            "ru": {
+              "displayName": "Название товара"
+            },
+            "en": {
+              "displayName": "Item name"
+            }
+          },
+          "category": "Item",
+          "order": 30,
+          "availability": "when-present"
+        },
+        {
+          "id": "field-value",
+          "source": "payload",
+          "path": "fieldValues",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Order field value",
+          "localization": {
+            "ru": {
+              "displayName": "Значение поля заказа"
+            },
+            "en": {
+              "displayName": "Order field value"
+            }
+          },
+          "category": "Order fields",
+          "order": 40,
+          "availability": "when-present",
+          "keyed": {
+            "guardPath": "item.categoryId",
+            "guardParameter": "categoryId"
+          }
+        },
+        {
+          "id": "field-choice-id",
+          "source": "payload",
+          "path": "fieldChoiceIds",
+          "valueSchema": {
+            "type": "string"
+          },
+          "displayName": "Order field choice ID",
+          "localization": {
+            "ru": {
+              "displayName": "ID варианта поля заказа"
+            },
+            "en": {
+              "displayName": "Order field choice ID"
+            }
+          },
+          "category": "Order fields",
+          "order": 50,
+          "availability": "when-present",
+          "keyed": {
+            "guardPath": "item.categoryId",
+            "guardParameter": "categoryId"
+          }
+        }
+      ],
+      "bindingCatalogs": [
+        {
+          "id": "playerok.categories",
+          "version": "1.0.0",
+          "displayName": "Playerok categories",
+          "localization": {
+            "ru": {
+              "displayName": "Категории Playerok"
+            },
+            "en": {
+              "displayName": "Playerok categories"
+            }
+          },
+          "scope": {
+            "displayName": "Category",
+            "localization": {
+              "ru": {
+                "displayName": "Категория"
+              },
+              "en": {
+                "displayName": "Category"
+              }
+            },
+            "selectorId": "category-id",
+            "guardParameter": "categoryId"
+          },
+          "valueFieldId": "field-value",
+          "choiceFieldId": "field-choice-id"
+        }
+      ],
+      "identityFields": [
+        "messageId"
+      ],
+      "ui": {
+        "category": "Messages",
+        "icon": "message"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "type": "playerok.universal/send-message",
+      "version": "1.0.0",
+      "kind": "action",
+      "displayName": "Send message",
+      "description": "Sends a text message to the Playerok chat associated with the current event.",
+      "localization": {
+        "ru": {
+          "displayName": "Отправить сообщение",
+          "description": "Отправляет текст в чат Playerok, из которого запущен сценарий."
+        },
+        "en": {
+          "displayName": "Send message",
+          "description": "Sends a text message to the Playerok chat that started the workflow."
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "configSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "requiredEventContext": [
+        {
+          "eventType": "commerce.purchase.created",
+          "eventVersion": "1.0.0",
+          "source": "scope",
+          "path": "chatId"
+        },
+        {
+          "eventType": "messaging.message.received",
+          "eventVersion": "1.0.0",
+          "source": "scope",
+          "path": "chatId"
+        }
+      ],
+      "retryPolicy": {
+        "maxAttempts": 3,
+        "initialBackoffMs": 2000,
+        "maxBackoffMs": 30000
+      },
+      "ui": {
+        "category": "Messages",
+        "icon": "message"
+      }
+    }
+  ],
+  "abstractions": [
+    {
+      "abstractionId": "messaging.send-in-context",
+      "abstractionVersion": "1.0.0",
+      "nodeType": "playerok.universal/send-message",
+      "nodeVersion": "1.0.0"
+    }
+  ]
+}
