@@ -11,6 +11,13 @@ versions.
 | --- | --- | --- |
 | [GGSel Seller](ggsel/) | Windows or Linux, Python 3.11+ | New purchases, buyer messages, replies (Seller API V1) |
 | [FunPay Cardinal](funpay-cardinal/) | FunPay Cardinal 0.1.17.8 | Orders, status changes, messages, replies, buyer input |
+| [Playerok Universal](playerok-universal/) | Playerok Universal embedded module | Paid sales, buyer messages, contextual replies, category/item catalogs, typed order fields |
+
+Runtime catalogs follow Buywell's neutral binding-catalog contract. Depending on
+the platform, a scope may be one product or a category containing several
+seller listings. Catalog selection is optional: ordinary event conditions stay
+available, while stable scope and choice IDs let a workflow map marketplace
+variants to neutral inputs without relying on mutable listing names.
 
 ## Build packages
 
@@ -27,7 +34,7 @@ the same source produces the same archive bytes.
 
 ```bash
 python -m unittest discover -s tests -v
-python -m compileall -q ggsel funpay-cardinal tools tests
+python -m compileall -q ggsel funpay-cardinal playerok-universal tools tests
 ```
 
 Runtime-specific installation steps are kept beside each runtime.
