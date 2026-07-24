@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "funpay-cardinal": {
+      "repository": "https://github.com/sidor0912/FunPayCardinal",
+      "commit": "9d5ce692574ce2705f31715ec916ebede5d44d4e",
+      "integration": "the Edge package vendors only FunPayAPI; Cardinal and Telegram host layers are not used"
+    },
+    "funpay-api": {
+      "repository": "https://github.com/sidor0912/FunPayCardinal/tree/9d5ce692574ce2705f31715ec916ebede5d44d4e/FunPayAPI",
+      "commit": "9d5ce692574ce2705f31715ec916ebede5d44d4e",
+      "license": "GPL-3.0",
+      "sourceTreeSha256": "654e89b3ece67625eb6855a84f64c61a6ab70f0b316c7298f0b664dec0886db4"
+    },
+    "playerok-universal": {
+      "repository": "https://github.com/alleexxeeyy/playerok-universal",
+      "commit": "f6257bfadac198ac3bcc0058090db0d7f3105067",
+      "integration": "provider behavior reference; host and Telegram layers are not used"
+    },
+    "playerok-api": {
+      "repository": "https://github.com/alleexxeeyy/PlayerokAPI",
+      "commit": "e2084a382081a584d24abb96cc1a64e5cb79a860",
+      "license": "MIT",
+      "sourceTreeSha256": "9b6faeea91512bba79352e5478d717840c4d4079c3b06662ca58397399232a8f",
+      "packagingDelta": "edge/vendor/playerokapi/listener/__init__.py only"
+    }
+  }
+}

@@ -1,17 +1,23 @@
 # Buywell runtimes
 
-Independent runtime sources and module packages for Buywell platform integrations.
-Each directory owns its module version, runtime artifact, manifest, installation
-guides, and changelog. Application releases do not change installed module
-versions.
+Official runtime sources and immutable packages for Buywell platform
+integrations. New installations run through Buywell Edge; the existing v1
+artifacts remain unchanged so published workflows and current users can migrate
+explicitly.
 
 ## Runtimes
 
-| Runtime | Environment | Capabilities |
+| Runtime | Edge-native package | Capabilities |
 | --- | --- | --- |
-| [GGSel Seller](ggsel/) | Windows or Linux, Python 3.11+ | New purchases, buyer messages, replies (Seller API V1) |
-| [FunPay Cardinal](funpay-cardinal/) | FunPay Cardinal 0.1.17.8 | Orders, status changes, messages, replies, buyer input |
-| [Playerok Universal](playerok-universal/) | Playerok Universal embedded module | Paid sales, buyer messages, contextual replies, category/item catalogs, typed order fields |
+| [GGSel Seller](ggsel/) | `ggsel.seller@1.2.3` | New purchases, buyer messages, replies and product catalog |
+| [FunPay](funpay-cardinal/) | `funpay.cardinal@1.3.0` | Orders, status changes, messages, replies and buyer input |
+| [Playerok](playerok-universal/) | `playerok.universal@1.0.4` | Paid sales, buyer messages, contextual replies and category/item catalogs |
+| [NSGifts](ns-gifts/) | `adapter.ns-gifts@1.0.0` | Edge-required wholesale adapter, signing, TOTP and IP-whitelist diagnostics |
+
+The marketplace packages embed their exact published v1 manifest under the
+Edge compatibility contract. Their module IDs, versions, events, actions,
+catalogs and existing Buywell authentication remain valid; only the local
+transport and process host change.
 
 Runtime catalogs follow Buywell's neutral binding-catalog contract. Depending on
 the platform, a scope may be one product or a category containing several
@@ -21,7 +27,7 @@ variants to neutral inputs without relying on mutable listing names.
 
 ## Build packages
 
-Python 3.11 or newer is sufficient. The build has no third-party dependencies.
+Legacy archives are still built with Python 3.11+:
 
 ```bash
 python tools/build_packages.py
@@ -30,11 +36,20 @@ python tools/build_packages.py
 Archives are written to `dist/`. ZIP entry ordering and timestamps are fixed so
 the same source produces the same archive bytes.
 
+Edge packages use Python 3.12 and the public `buywell-edge-sdk`:
+
+```bash
+python tools/build_edge_packages.py
+```
+
+The builder signs packages, generates Manifest v2 from Python declarations and
+keeps each upstream provider dependency pinned in `upstreams.lock.json`.
+
 ## Validate
 
 ```bash
 python -m unittest discover -s tests -v
-python -m compileall -q ggsel funpay-cardinal playerok-universal tools tests
+python -m compileall -q ggsel funpay-cardinal playerok-universal ns-gifts tools tests
 ```
 
 Runtime-specific installation steps are kept beside each runtime.

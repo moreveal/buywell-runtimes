@@ -1,0 +1,10 @@
+# NSGifts Wholesale on Buywell Edge
+
+NSGifts requires an outgoing-IP whitelist, so this adapter driver always runs
+on your Edge. After connecting, copy the outgoing IP shown by Buywell into the
+NSGifts whitelist and run the health check.
+
+`user_id`, login, password, `api_secret`, TOTP secret, session token, and order
+state stay local. The driver signs exact bytes, never blindly repeats
+`pay_order`, and reconciles timeouts/409 responses through `order_info`. Cloud
+fallback is technically forbidden.
