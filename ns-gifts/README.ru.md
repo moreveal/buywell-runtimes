@@ -1,8 +1,9 @@
 # NSGifts Wholesale через Buywell Edge
 
 NSGifts требует whitelist исходящего IP, поэтому этот adapter driver всегда
-исполняется на вашем Edge. После подключения скопируйте показанный Buywell
-исходящий IP в whitelist NSGifts и запустите health check.
+исполняется на вашем Edge. Запросы к провайдеру используют IPv4. После
+подключения скопируйте показанный Buywell исходящий IPv4-адрес в whitelist
+NSGifts и запустите health check.
 
 `user_id`, login, password, `api_secret`, TOTP secret, session token и
 состояние заказа хранятся только локально. Driver подписывает точные bytes,

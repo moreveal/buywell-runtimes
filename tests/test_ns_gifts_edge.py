@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 if os.getenv("BUYWELL_EDGE_CONTRACTS_SKIP") == "1":
     raise unittest.SkipTest("Edge contracts run in the isolated Python 3.12 job")
@@ -29,6 +30,31 @@ spec.loader.exec_module(module)
 
 
 class NSGiftsEdgeTests(unittest.IsolatedAsyncioTestCase):
+    def test_default_client_uses_outgoing_ipv4(self):
+        transport = Mock()
+        http = Mock()
+        with (
+            patch.object(module.httpx, "AsyncHTTPTransport", return_value=transport) as transport_factory,
+            patch.object(module.httpx, "AsyncClient", return_value=http) as client_factory,
+        ):
+            client = module.NSGiftsClient(
+                module.Credentials(
+                    "123",
+                    "login",
+                    "password",
+                    base64.b64encode(b"secret").decode(),
+                    None,
+                )
+            )
+
+        transport_factory.assert_called_once_with(local_address="0.0.0.0")
+        client_factory.assert_called_once_with(
+            base_url="https://api.ns.gifts",
+            timeout=30,
+            transport=transport,
+        )
+        self.assertIs(client.client, http)
+
     def test_canonical_signature_matches_documented_formula(self):
         secret_bytes = b"buywell-ns-gifts-test-secret"
         secret = base64.b64encode(secret_bytes).decode()
@@ -130,7 +156,34 @@ class NSGiftsEdgeTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(module.NSGiftsError) as captured:
                 await client.ensure_token()
         self.assertEqual(captured.exception.code, "IP_NOT_WHITELISTED")
+        self.assertEqual(str(captured.exception), "IP is not allowed")
         self.assertFalse(captured.exception.retryable)
+
+    async def test_maps_missing_v2_permission_separately_from_whitelist(self):
+        async def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/api/v2/get_token":
+                return httpx.Response(403, json={"detail": "API v2 permission is missing"})
+            raise AssertionError("unexpected request")
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(
+            base_url="https://api.ns.gifts",
+            transport=transport,
+        ) as http:
+            client = module.NSGiftsClient(
+                module.Credentials(
+                    "123",
+                    "login",
+                    "password",
+                    base64.b64encode(b"secret").decode(),
+                    None,
+                ),
+                client=http,
+            )
+            with self.assertRaises(module.NSGiftsError) as captured:
+                await client.ensure_token()
+        self.assertEqual(captured.exception.code, "ACCESS_FORBIDDEN")
+        self.assertEqual(str(captured.exception), "API v2 permission is missing")
 
     async def test_concurrent_requests_use_unique_timestamps_and_exact_query_order(self):
         requests: list[httpx.Request] = []

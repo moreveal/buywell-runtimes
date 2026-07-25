@@ -132,7 +132,11 @@ class NSGiftsClient:
         clock: callable = time.time,
     ) -> None:
         self.credentials = credentials
-        self.client = client or httpx.AsyncClient(base_url=BASE_URL, timeout=30)
+        self.client = client or httpx.AsyncClient(
+            base_url=BASE_URL,
+            timeout=30,
+            transport=httpx.AsyncHTTPTransport(local_address="0.0.0.0"),
+        )
         self._owns_client = client is None
         self.clock = clock
         self.token: str | None = None
@@ -246,7 +250,17 @@ class NSGiftsClient:
             payload = {}
         message = str(payload.get("detail") or payload.get("message") or f"NSGifts returned HTTP {response.status_code}")
         if response.status_code == 403:
-            raise NSGiftsError("IP_NOT_WHITELISTED", "Add the Edge outgoing IP to the NSGifts whitelist", status=403)
+            normalized = message.casefold()
+            if normalized.startswith("ip ") or any(
+                marker in normalized
+                for marker in ("ip address", "client ip", "source ip", "whitelist", "allowlist")
+            ):
+                raise NSGiftsError("IP_NOT_WHITELISTED", message, status=403)
+            raise NSGiftsError(
+                "ACCESS_FORBIDDEN",
+                message if message != "NSGifts returned HTTP 403" else "NSGifts denied API access; verify the IP whitelist and API v2 permissions",
+                status=403,
+            )
         if response.status_code == 428:
             raise NSGiftsError("TOTP_REQUIRED", "NSGifts requires a current TOTP code", status=428)
         if response.status_code == 409:
@@ -271,7 +285,7 @@ class NSGiftsClient:
 
 extension = adapter_driver(
     extension_id="adapter.ns-gifts",
-    version="1.0.1",
+    version="1.0.2",
     display_name={"ru": "NSGifts Wholesale", "en": "NSGifts Wholesale"},
     description={
         "ru": "Оптовые подарочные карты через IP вашего Buywell Edge",
