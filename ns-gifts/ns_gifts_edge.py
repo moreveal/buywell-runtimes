@@ -369,7 +369,7 @@ class NSGiftsClient:
 
 extension = adapter_driver(
     extension_id="adapter.ns-gifts",
-    version="1.0.5",
+    version="1.0.6",
     display_name={"ru": "NSGifts Wholesale", "en": "NSGifts Wholesale"},
     description={
         "ru": "Оптовые подарочные карты через IP вашего Buywell Edge",
@@ -382,9 +382,9 @@ extension = adapter_driver(
     dependencies=["httpx==0.28.1"],
     guides={"ru": "README.ru.md", "en": "README.en.md"},
     changelog={"ru": "CHANGELOG.ru.md", "en": "CHANGELOG.en.md"},
-    adapter_version="1.4.1",
+    adapter_version="1.4.2",
     adapter_dsl_namespace="ns_gifts",
-    adapter_definition_revision=6,
+    adapter_definition_revision=7,
 )
 
 _clients: dict[str, NSGiftsClient] = {}
@@ -439,6 +439,107 @@ async def _order_info(client: NSGiftsClient, custom_id: str) -> dict[str, Any]:
 )
 async def stock(context: Any, _input: StockInput) -> dict[str, Any]:
     return await _client(context).request("GET", "/api/v2/stock")
+
+
+_SERVICE_COLLECTIONS = {"services", "products", "items", "offers"}
+_CATEGORY_COLLECTIONS = {"categories", "children", "subcategories", "groups"}
+
+
+def _catalog_text(value: Any) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _catalog_value(item: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = _catalog_text(item.get(key))
+        if value:
+            return value
+    return ""
+
+
+def _stock_catalog_items(payload: dict[str, Any]) -> list[dict[str, str]]:
+    found: dict[str, dict[str, str]] = {}
+
+    def visit(value: Any, parents: tuple[str, ...] = (), service_item: bool = False) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item, parents, service_item)
+            return
+        if not isinstance(value, dict):
+            return
+
+        name = _catalog_value(value, "service_name", "serviceName", "display_name", "displayName", "title", "name")
+        service_id = _catalog_value(value, "service_id", "serviceId")
+        if not service_id and service_item:
+            service_id = _catalog_value(value, "id")
+        if service_id:
+            pieces = [*parents, name or f"Service {service_id}"]
+            price = _catalog_value(value, "price", "sell_price", "sellPrice", "amount")
+            currency = _catalog_value(value, "currency", "currency_code", "currencyCode")
+            stock_value = _catalog_value(value, "stock", "quantity", "available", "count")
+            if price:
+                pieces.append(f"{price}{f' {currency}' if currency else ''}")
+            if stock_value:
+                pieces.append(f"stock {stock_value}")
+            found.setdefault(service_id, {"key": service_id, "label": " · ".join(filter(None, pieces))[:500]})
+
+        category_name = _catalog_value(value, "category_name", "categoryName")
+        if not category_name and not service_id:
+            category_name = name
+        child_parents = (*parents, category_name) if category_name and category_name not in parents else parents
+        traversed = False
+        for key, child in value.items():
+            if key in _SERVICE_COLLECTIONS:
+                visit(child, child_parents, True)
+                traversed = True
+            elif key in _CATEGORY_COLLECTIONS:
+                visit(child, child_parents, False)
+                traversed = True
+        if not traversed and not service_id:
+            for key, child in value.items():
+                if not isinstance(child, (dict, list)):
+                    continue
+                if service_item and isinstance(child, dict) and str(key).isdigit():
+                    visit({"service_id": key, **child}, parents, True)
+                else:
+                    visit(child, (*parents, str(key)), True)
+
+    visit(payload)
+    return sorted(found.values(), key=lambda item: (item["label"].casefold(), item["key"]))
+
+
+@extension.binding_catalog("ns-gifts.stock", "1.0.0")
+async def stock_catalog(context: Any, job: dict[str, Any]) -> dict[str, Any]:
+    payload = await _client(context).request("GET", "/api/v2/stock")
+    items = _stock_catalog_items(payload)
+    identity = {
+        "protocolVersion": "1.0.0",
+        "requestId": str(job.get("requestId") or ""),
+        "catalogId": "ns-gifts.stock",
+        "catalogVersion": "1.0.0",
+    }
+    operation = str(job.get("operation") or "")
+    if operation == "list-scopes":
+        query = str(job.get("query") or "").casefold().strip()
+        filtered = [item for item in items if not query or query in f"{item['key']} {item['label']}".casefold()]
+        try:
+            offset = max(0, int(job.get("cursor") or 0))
+        except (TypeError, ValueError):
+            offset = 0
+        page = filtered[offset : offset + 100]
+        return {
+            **identity,
+            "operation": operation,
+            "scopes": page,
+            **({"nextCursor": str(offset + len(page))} if offset + len(page) < len(filtered) else {}),
+        }
+    if operation != "get-scope":
+        raise ValueError("Unsupported NSGifts catalog operation")
+    scope_key = str(job.get("scopeKey") or "")
+    selected = next((item for item in items if item["key"] == scope_key), None)
+    if not selected:
+        raise ValueError("NSGifts service is not available in the current stock")
+    return {**identity, "operation": operation, "scope": selected, "fields": []}
 
 
 @extension.operation(

@@ -30,6 +30,67 @@ spec.loader.exec_module(module)
 
 
 class NSGiftsEdgeTests(unittest.IsolatedAsyncioTestCase):
+    def test_stock_catalog_accepts_provider_maps_keyed_by_category_and_service(self):
+        payload = {
+            "categories": {
+                "PlayStation": {
+                    "services": {
+                        "901": {"title": "PS Store 1000", "quantity": 3},
+                    }
+                }
+            }
+        }
+        self.assertEqual(module._stock_catalog_items(payload), [{
+            "key": "901",
+            "label": "PlayStation · PS Store 1000 · stock 3",
+        }])
+
+    async def test_stock_catalog_searches_live_services_and_returns_selected_scope(self):
+        class Client:
+            def __init__(self) -> None:
+                self.calls = []
+
+            async def request(self, method, path, **kwargs):
+                self.calls.append((method, path, kwargs))
+                return {
+                    "categories": [{
+                        "name": "Steam",
+                        "services": [
+                            {"id": 449, "name": "Steam Wallet RU", "price": "101.50", "currency": "RUB", "stock": 12},
+                            {"service_id": 450, "service_name": "Xbox Gift Card", "available": 4},
+                        ],
+                    }]
+                }
+
+        client = Client()
+        module._clients["connection"] = client
+        context = SimpleNamespace(connection_id="connection")
+        try:
+            listed = await module.stock_catalog(context, {
+                "requestId": "00000000-0000-4000-8000-000000000001",
+                "operation": "list-scopes",
+                "query": "steam wallet",
+            })
+            selected = await module.stock_catalog(context, {
+                "requestId": "00000000-0000-4000-8000-000000000002",
+                "operation": "get-scope",
+                "scopeKey": "449",
+            })
+        finally:
+            module._clients.pop("connection", None)
+
+        self.assertEqual(listed["catalogId"], "ns-gifts.stock")
+        self.assertEqual(listed["scopes"], [{
+            "key": "449",
+            "label": "Steam · Steam Wallet RU · 101.50 RUB · stock 12",
+        }])
+        self.assertEqual(selected["scope"], listed["scopes"][0])
+        self.assertEqual(selected["fields"], [])
+        self.assertEqual(client.calls, [
+            ("GET", "/api/v2/stock", {}),
+            ("GET", "/api/v2/stock", {}),
+        ])
+
     async def test_additional_adapter_actions_use_exact_provider_requests(self):
         class Client:
             def __init__(self) -> None:

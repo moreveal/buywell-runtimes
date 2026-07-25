@@ -1,3 +1,8 @@
+# 1.0.6
+
+- The live `ns-gifts.stock` catalog now loads products, prices, and stock through the connected Buywell Edge.
+- Product, category, and service ID search works without manually selecting a connection when a ready healthy NSGifts account is available.
+
 # 1.0.5
 
 - Managed adapter fields and actions now carry localized descriptions from the Edge package.
