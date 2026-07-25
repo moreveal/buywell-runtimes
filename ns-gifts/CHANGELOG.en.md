@@ -1,3 +1,8 @@
+# 1.0.5
+
+- Managed adapter fields and actions now carry localized descriptions from the Edge package.
+- Open-ended NSGifts values, such as the balance, are declared as arbitrary data instead of object-only data.
+
 # 1.0.4
 
 - The signed Edge package now declares its managed adapter to Buywell Automation.

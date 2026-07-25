@@ -17,9 +17,9 @@ from typing import Any
 from urllib.parse import urlencode
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, SecretStr
 
-from buywell_edge_sdk import Health, HealthState, adapter_driver, configuration_field
+from buywell_edge_sdk import Health, HealthState, adapter_driver, configuration_field, contract_field
 
 BASE_URL = "https://api.ns.gifts"
 TERMINAL_STATUSES = {2: "completed", 5: "canceled", 7: "refunded"}
@@ -45,8 +45,14 @@ class NSGiftsConfiguration(BaseModel):
 
 
 class DynamicField(BaseModel):
-    key: str
-    value: Any
+    key: str = contract_field(
+        label={"ru": "Ключ поля", "en": "Field key"},
+        description="Provider field key from the selected NSGifts service.",
+    )
+    value: Any = contract_field(
+        label={"ru": "Значение поля", "en": "Field value"},
+        description="Provider field value sent to NSGifts.",
+    )
 
 
 class StockInput(BaseModel):
@@ -58,29 +64,57 @@ class EmptyInput(BaseModel):
 
 
 class ExchangeRateInput(BaseModel):
-    service_id: int
+    service_id: int = contract_field(
+        label={"ru": "ID сервиса", "en": "Service ID"},
+        description="NSGifts service identifier.",
+    )
 
 
 class SteamUserInput(BaseModel):
-    steam_id: str
+    steam_id: str = contract_field(
+        label={"ru": "Steam ID", "en": "Steam ID"},
+        description="Steam account identifier to check.",
+    )
 
 
 class CreateOrderInput(BaseModel):
-    service_id: int
-    fields: list[DynamicField]
-    custom_id: str | None = None
+    service_id: int = contract_field(
+        label={"ru": "ID сервиса", "en": "Service ID"},
+        description="NSGifts service identifier.",
+    )
+    fields: list[DynamicField] = contract_field(
+        label={"ru": "Поля заказа", "en": "Order fields"},
+        description="Provider-specific order fields.",
+    )
+    custom_id: str | None = contract_field(
+        label={"ru": "ID заказа Buywell", "en": "Buywell order ID"},
+        default=None,
+        description="Optional idempotent order UUID; generated automatically when empty.",
+    )
 
 
 class PayOrderInput(BaseModel):
-    custom_id: str
+    custom_id: str = contract_field(
+        label={"ru": "ID заказа Buywell", "en": "Buywell order ID"},
+        description="Idempotent order UUID returned by order creation.",
+    )
 
 
 class OrderInfoInput(BaseModel):
-    custom_id: str
+    custom_id: str = contract_field(
+        label={"ru": "ID заказа Buywell", "en": "Buywell order ID"},
+        description="Idempotent order UUID to check.",
+    )
 
 
 class FulfillOrderInput(CreateOrderInput):
-    timeout_seconds: int = Field(default=180, ge=5, le=900)
+    timeout_seconds: int = contract_field(
+        label={"ru": "Таймаут ожидания", "en": "Wait timeout"},
+        default=180,
+        ge=5,
+        le=900,
+        description="How long Edge waits for a terminal order status, in seconds.",
+    )
 
 
 class ProviderOutput(BaseModel):
@@ -88,33 +122,41 @@ class ProviderOutput(BaseModel):
 
 
 class StockOutput(ProviderOutput):
-    categories: list[Any] | None = None
+    categories: list[Any] | None = contract_field(
+        label={"ru": "Категории", "en": "Categories"},
+        default=None,
+        description="Raw NSGifts stock categories.",
+    )
 
 
 class OrderOutput(ProviderOutput):
-    custom_id: str | None = None
-    total_to_pay: str | None = None
-    status: Any = None
-    status_message: str | None = None
-    pins: list[Any] | None = None
+    custom_id: str | None = contract_field(label={"ru": "ID заказа Buywell", "en": "Buywell order ID"}, default=None)
+    total_to_pay: str | None = contract_field(label={"ru": "К оплате", "en": "Total to pay"}, default=None)
+    status: Any = contract_field(label={"ru": "Статус", "en": "Status"}, default=None)
+    status_message: str | None = contract_field(label={"ru": "Сообщение статуса", "en": "Status message"}, default=None)
+    pins: list[Any] | None = contract_field(label={"ru": "Пины", "en": "Pins"}, default=None)
 
 
 class BalanceOutput(ProviderOutput):
-    balance: Any = None
+    balance: Any = contract_field(
+        label={"ru": "Баланс", "en": "Balance"},
+        default=None,
+        description="Raw NSGifts balance value.",
+    )
 
 
 class ExchangeRateOutput(ProviderOutput):
-    service_id: int | None = None
-    date: str | None = None
-    rates: dict[str, Any] | None = None
+    service_id: int | None = contract_field(label={"ru": "ID сервиса", "en": "Service ID"}, default=None)
+    date: str | None = contract_field(label={"ru": "Дата", "en": "Date"}, default=None)
+    rates: dict[str, Any] | None = contract_field(label={"ru": "Курсы", "en": "Rates"}, default=None)
 
 
 class SteamUserOutput(ProviderOutput):
-    accountStatus: bool | None = None
+    accountStatus: bool | None = contract_field(label={"ru": "Аккаунт доступен", "en": "Account available"}, default=None)
 
 
 class SteamCatalogOutput(ProviderOutput):
-    apps: list[Any] | None = None
+    apps: list[Any] | None = contract_field(label={"ru": "Приложения", "en": "Apps"}, default=None)
 
 
 class NSGiftsError(RuntimeError):
@@ -327,7 +369,7 @@ class NSGiftsClient:
 
 extension = adapter_driver(
     extension_id="adapter.ns-gifts",
-    version="1.0.4",
+    version="1.0.5",
     display_name={"ru": "NSGifts Wholesale", "en": "NSGifts Wholesale"},
     description={
         "ru": "Оптовые подарочные карты через IP вашего Buywell Edge",
@@ -340,9 +382,9 @@ extension = adapter_driver(
     dependencies=["httpx==0.28.1"],
     guides={"ru": "README.ru.md", "en": "README.en.md"},
     changelog={"ru": "CHANGELOG.ru.md", "en": "CHANGELOG.en.md"},
-    adapter_version="1.4.0",
+    adapter_version="1.4.1",
     adapter_dsl_namespace="ns_gifts",
-    adapter_definition_revision=5,
+    adapter_definition_revision=6,
 )
 
 _clients: dict[str, NSGiftsClient] = {}
@@ -390,6 +432,10 @@ async def _order_info(client: NSGiftsClient, custom_id: str) -> dict[str, Any]:
     input_model=StockInput,
     output_model=StockOutput,
     display_name={"ru": "Остатки", "en": "Stock"},
+    description={
+        "ru": "Получить доступные категории и сервисы NSGifts.",
+        "en": "Fetch available NSGifts categories and services.",
+    },
 )
 async def stock(context: Any, _input: StockInput) -> dict[str, Any]:
     return await _client(context).request("GET", "/api/v2/stock")
@@ -401,6 +447,10 @@ async def stock(context: Any, _input: StockInput) -> dict[str, Any]:
     input_model=CreateOrderInput,
     output_model=OrderOutput,
     display_name={"ru": "Создать заказ", "en": "Create order"},
+    description={
+        "ru": "Создать идемпотентный заказ у NSGifts без оплаты.",
+        "en": "Create an idempotent NSGifts order without payment.",
+    },
 )
 async def create_order(context: Any, value: CreateOrderInput) -> dict[str, Any]:
     custom_id = value.custom_id or str(uuid.uuid4())
@@ -427,6 +477,10 @@ async def create_order(context: Any, value: CreateOrderInput) -> dict[str, Any]:
     input_model=PayOrderInput,
     output_model=OrderOutput,
     display_name={"ru": "Оплатить заказ", "en": "Pay order"},
+    description={
+        "ru": "Оплатить созданный заказ и сверить результат с NSGifts.",
+        "en": "Pay a created order and reconcile the result with NSGifts.",
+    },
 )
 async def pay_order(context: Any, value: PayOrderInput) -> dict[str, Any]:
     client = _client(context)
@@ -470,6 +524,10 @@ async def pay_order(context: Any, value: PayOrderInput) -> dict[str, Any]:
     input_model=OrderInfoInput,
     output_model=OrderOutput,
     display_name={"ru": "Статус заказа", "en": "Order info"},
+    description={
+        "ru": "Проверить текущее состояние заказа NSGifts.",
+        "en": "Check the current NSGifts order state.",
+    },
 )
 async def order_info(context: Any, value: OrderInfoInput) -> dict[str, Any]:
     return await _order_info(_client(context), value.custom_id)
@@ -481,6 +539,10 @@ async def order_info(context: Any, value: OrderInfoInput) -> dict[str, Any]:
     input_model=EmptyInput,
     output_model=BalanceOutput,
     display_name={"ru": "Проверить баланс", "en": "Check balance"},
+    description={
+        "ru": "Получить текущий баланс аккаунта NSGifts.",
+        "en": "Fetch the current NSGifts account balance.",
+    },
 )
 async def check_balance(context: Any, _input: EmptyInput) -> dict[str, Any]:
     return await _client(context).request("GET", "/api/v2/check_balance")
@@ -492,6 +554,10 @@ async def check_balance(context: Any, _input: EmptyInput) -> dict[str, Any]:
     input_model=ExchangeRateInput,
     output_model=ExchangeRateOutput,
     display_name={"ru": "Рассчитать курс", "en": "Calculate exchange rate"},
+    description={
+        "ru": "Получить расчёт курса для выбранного сервиса NSGifts.",
+        "en": "Fetch the exchange-rate calculation for an NSGifts service.",
+    },
 )
 async def exchange_rate(context: Any, value: ExchangeRateInput) -> dict[str, Any]:
     return await _client(context).request(
@@ -507,6 +573,10 @@ async def exchange_rate(context: Any, value: ExchangeRateInput) -> dict[str, Any
     input_model=SteamUserInput,
     output_model=SteamUserOutput,
     display_name={"ru": "Проверить Steam-пользователя", "en": "Check Steam user"},
+    description={
+        "ru": "Проверить доступность Steam-аккаунта для операции.",
+        "en": "Check whether a Steam account is available for the operation.",
+    },
 )
 async def check_steam_user(context: Any, value: SteamUserInput) -> dict[str, Any]:
     return await _client(context).request(
@@ -522,6 +592,10 @@ async def check_steam_user(context: Any, value: SteamUserInput) -> dict[str, Any
     input_model=EmptyInput,
     output_model=SteamCatalogOutput,
     display_name={"ru": "Каталог Steam Gifts", "en": "Steam Gifts catalog"},
+    description={
+        "ru": "Получить каталог приложений Steam Gifts из NSGifts.",
+        "en": "Fetch the Steam Gifts app catalog from NSGifts.",
+    },
 )
 async def steam_gifts_catalog(context: Any, _input: EmptyInput) -> dict[str, Any]:
     return await _client(context).request("GET", "/api/v2/steam_gift/get_apps")
@@ -533,6 +607,10 @@ async def steam_gifts_catalog(context: Any, _input: EmptyInput) -> dict[str, Any
     input_model=FulfillOrderInput,
     output_model=OrderOutput,
     display_name={"ru": "Исполнить заказ", "en": "Fulfill order"},
+    description={
+        "ru": "Создать, оплатить и дождаться итогового статуса заказа.",
+        "en": "Create, pay, and wait for a terminal order status.",
+    },
 )
 async def fulfill_order(context: Any, value: FulfillOrderInput) -> dict[str, Any]:
     custom_id = value.custom_id or str(uuid.uuid4())

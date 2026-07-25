@@ -89,6 +89,19 @@ class EdgeContractTests(unittest.TestCase):
             for item in generated["contracts"]["adapterOperations"]
         }
         self.assertEqual(actual, expected)
+        balance = next(
+            item
+            for item in generated["contracts"]["adapterOperations"]
+            if item["id"] == "adapter.ns-gifts/action-66666666"
+        )
+        self.assertEqual(
+            balance["description"]["ru"],
+            "Получить текущий баланс аккаунта NSGifts.",
+        )
+        self.assertNotIn(
+            "type",
+            balance["output_schema"]["properties"]["balance"],
+        )
 
     def test_vendored_playerok_api_matches_locked_upstream(self) -> None:
         lock = json.loads((ROOT / "upstreams.lock.json").read_text("utf-8"))
