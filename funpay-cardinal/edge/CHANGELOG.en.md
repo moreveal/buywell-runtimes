@@ -1,3 +1,8 @@
+# 1.3.2 Edge
+
+- Starts the FunPay Runner worker loop so order and message polling actually runs.
+- Connection health now follows live polling: lost authorization requests sign-in again, while stalled polling is reported as unavailable.
+
 # 1.3.1 Edge
 
 - Interactive Edge setup now reads Russian and English field labels from the FunPay package.
