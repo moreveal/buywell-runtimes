@@ -87,6 +87,36 @@ class ProviderOutput(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class StockOutput(ProviderOutput):
+    categories: list[Any] | None = None
+
+
+class OrderOutput(ProviderOutput):
+    custom_id: str | None = None
+    total_to_pay: str | None = None
+    status: Any = None
+    status_message: str | None = None
+    pins: list[Any] | None = None
+
+
+class BalanceOutput(ProviderOutput):
+    balance: Any = None
+
+
+class ExchangeRateOutput(ProviderOutput):
+    service_id: int | None = None
+    date: str | None = None
+    rates: dict[str, Any] | None = None
+
+
+class SteamUserOutput(ProviderOutput):
+    accountStatus: bool | None = None
+
+
+class SteamCatalogOutput(ProviderOutput):
+    apps: list[Any] | None = None
+
+
 class NSGiftsError(RuntimeError):
     def __init__(self, code: str, message: str, *, retryable: bool = False, status: int | None = None) -> None:
         super().__init__(message)
@@ -297,7 +327,7 @@ class NSGiftsClient:
 
 extension = adapter_driver(
     extension_id="adapter.ns-gifts",
-    version="1.0.3",
+    version="1.0.4",
     display_name={"ru": "NSGifts Wholesale", "en": "NSGifts Wholesale"},
     description={
         "ru": "Оптовые подарочные карты через IP вашего Buywell Edge",
@@ -310,6 +340,9 @@ extension = adapter_driver(
     dependencies=["httpx==0.28.1"],
     guides={"ru": "README.ru.md", "en": "README.en.md"},
     changelog={"ru": "CHANGELOG.ru.md", "en": "CHANGELOG.en.md"},
+    adapter_version="1.4.0",
+    adapter_dsl_namespace="ns_gifts",
+    adapter_definition_revision=5,
 )
 
 _clients: dict[str, NSGiftsClient] = {}
@@ -355,7 +388,7 @@ async def _order_info(client: NSGiftsClient, custom_id: str) -> dict[str, Any]:
     "adapter.ns-gifts/action-11111111",
     "1.0.0",
     input_model=StockInput,
-    output_model=ProviderOutput,
+    output_model=StockOutput,
     display_name={"ru": "Остатки", "en": "Stock"},
 )
 async def stock(context: Any, _input: StockInput) -> dict[str, Any]:
@@ -366,7 +399,7 @@ async def stock(context: Any, _input: StockInput) -> dict[str, Any]:
     "adapter.ns-gifts/action-22222222",
     "1.0.0",
     input_model=CreateOrderInput,
-    output_model=ProviderOutput,
+    output_model=OrderOutput,
     display_name={"ru": "Создать заказ", "en": "Create order"},
 )
 async def create_order(context: Any, value: CreateOrderInput) -> dict[str, Any]:
@@ -392,7 +425,7 @@ async def create_order(context: Any, value: CreateOrderInput) -> dict[str, Any]:
     "adapter.ns-gifts/action-33333333",
     "1.0.0",
     input_model=PayOrderInput,
-    output_model=ProviderOutput,
+    output_model=OrderOutput,
     display_name={"ru": "Оплатить заказ", "en": "Pay order"},
 )
 async def pay_order(context: Any, value: PayOrderInput) -> dict[str, Any]:
@@ -435,7 +468,7 @@ async def pay_order(context: Any, value: PayOrderInput) -> dict[str, Any]:
     "adapter.ns-gifts/action-44444444",
     "1.0.0",
     input_model=OrderInfoInput,
-    output_model=ProviderOutput,
+    output_model=OrderOutput,
     display_name={"ru": "Статус заказа", "en": "Order info"},
 )
 async def order_info(context: Any, value: OrderInfoInput) -> dict[str, Any]:
@@ -446,7 +479,7 @@ async def order_info(context: Any, value: OrderInfoInput) -> dict[str, Any]:
     "adapter.ns-gifts/action-66666666",
     "1.0.0",
     input_model=EmptyInput,
-    output_model=ProviderOutput,
+    output_model=BalanceOutput,
     display_name={"ru": "Проверить баланс", "en": "Check balance"},
 )
 async def check_balance(context: Any, _input: EmptyInput) -> dict[str, Any]:
@@ -457,7 +490,7 @@ async def check_balance(context: Any, _input: EmptyInput) -> dict[str, Any]:
     "adapter.ns-gifts/action-77777777",
     "1.0.0",
     input_model=ExchangeRateInput,
-    output_model=ProviderOutput,
+    output_model=ExchangeRateOutput,
     display_name={"ru": "Рассчитать курс", "en": "Calculate exchange rate"},
 )
 async def exchange_rate(context: Any, value: ExchangeRateInput) -> dict[str, Any]:
@@ -472,7 +505,7 @@ async def exchange_rate(context: Any, value: ExchangeRateInput) -> dict[str, Any
     "adapter.ns-gifts/steam-88888888",
     "1.0.0",
     input_model=SteamUserInput,
-    output_model=ProviderOutput,
+    output_model=SteamUserOutput,
     display_name={"ru": "Проверить Steam-пользователя", "en": "Check Steam user"},
 )
 async def check_steam_user(context: Any, value: SteamUserInput) -> dict[str, Any]:
@@ -487,7 +520,7 @@ async def check_steam_user(context: Any, value: SteamUserInput) -> dict[str, Any
     "adapter.ns-gifts/steam-gifts-99999999",
     "1.0.0",
     input_model=EmptyInput,
-    output_model=ProviderOutput,
+    output_model=SteamCatalogOutput,
     display_name={"ru": "Каталог Steam Gifts", "en": "Steam Gifts catalog"},
 )
 async def steam_gifts_catalog(context: Any, _input: EmptyInput) -> dict[str, Any]:
@@ -498,7 +531,7 @@ async def steam_gifts_catalog(context: Any, _input: EmptyInput) -> dict[str, Any
     "adapter.ns-gifts/action-55555555",
     "1.0.0",
     input_model=FulfillOrderInput,
-    output_model=ProviderOutput,
+    output_model=OrderOutput,
     display_name={"ru": "Исполнить заказ", "en": "Fulfill order"},
 )
 async def fulfill_order(context: Any, value: FulfillOrderInput) -> dict[str, Any]:

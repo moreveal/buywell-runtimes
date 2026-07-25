@@ -1,3 +1,8 @@
+# 1.0.4
+
+- The signed Edge package now declares its managed adapter to Buywell Automation.
+- Connecting it makes its blocks, input fields, and results available without a separate manual adapter registration.
+
 # 1.0.3
 
 - The driver now implements all nine actions in the published NSGifts adapter, including balance, exchange rate, and Steam Gifts.
