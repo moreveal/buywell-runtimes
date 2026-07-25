@@ -71,6 +71,25 @@ class EdgeContractTests(unittest.TestCase):
                     legacy["module"]["version"],
                 )
 
+    def test_ns_gifts_exposes_every_published_adapter_contract(self) -> None:
+        generated = self._manifest(ROOT / "ns-gifts", "ns_gifts_edge")
+        expected = {
+            "adapter.ns-gifts/action-11111111",
+            "adapter.ns-gifts/action-22222222",
+            "adapter.ns-gifts/action-33333333",
+            "adapter.ns-gifts/action-44444444",
+            "adapter.ns-gifts/action-55555555",
+            "adapter.ns-gifts/action-66666666",
+            "adapter.ns-gifts/action-77777777",
+            "adapter.ns-gifts/steam-88888888",
+            "adapter.ns-gifts/steam-gifts-99999999",
+        }
+        actual = {
+            item["id"]
+            for item in generated["contracts"]["adapterOperations"]
+        }
+        self.assertEqual(actual, expected)
+
     def test_vendored_playerok_api_matches_locked_upstream(self) -> None:
         lock = json.loads((ROOT / "upstreams.lock.json").read_text("utf-8"))
         expected = lock["sources"]["playerok-api"]["sourceTreeSha256"]

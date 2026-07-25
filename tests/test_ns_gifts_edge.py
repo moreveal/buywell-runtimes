@@ -30,6 +30,48 @@ spec.loader.exec_module(module)
 
 
 class NSGiftsEdgeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_additional_adapter_actions_use_exact_provider_requests(self):
+        class Client:
+            def __init__(self) -> None:
+                self.calls = []
+
+            async def request(self, method, path, **kwargs):
+                self.calls.append((method, path, kwargs))
+                return {"ok": True}
+
+        client = Client()
+        module._clients["connection"] = client
+        context = SimpleNamespace(connection_id="connection")
+        try:
+            await module.check_balance(context, module.EmptyInput())
+            await module.exchange_rate(
+                context, module.ExchangeRateInput(service_id=449)
+            )
+            await module.check_steam_user(
+                context, module.SteamUserInput(steam_id="example")
+            )
+            await module.steam_gifts_catalog(context, module.EmptyInput())
+        finally:
+            module._clients.pop("connection", None)
+
+        self.assertEqual(
+            client.calls,
+            [
+                ("GET", "/api/v2/check_balance", {}),
+                (
+                    "POST",
+                    "/api/v2/exchange_rate",
+                    {"json_body": {"service_id": 449}},
+                ),
+                (
+                    "POST",
+                    "/api/v2/steam/check_user",
+                    {"json_body": {"steam_id": "example"}},
+                ),
+                ("GET", "/api/v2/steam_gift/get_apps", {}),
+            ],
+        )
+
     def test_default_client_uses_outgoing_ipv4(self):
         transport = Mock()
         http = Mock()

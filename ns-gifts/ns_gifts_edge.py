@@ -53,6 +53,18 @@ class StockInput(BaseModel):
     pass
 
 
+class EmptyInput(BaseModel):
+    pass
+
+
+class ExchangeRateInput(BaseModel):
+    service_id: int
+
+
+class SteamUserInput(BaseModel):
+    steam_id: str
+
+
 class CreateOrderInput(BaseModel):
     service_id: int
     fields: list[DynamicField]
@@ -285,7 +297,7 @@ class NSGiftsClient:
 
 extension = adapter_driver(
     extension_id="adapter.ns-gifts",
-    version="1.0.2",
+    version="1.0.3",
     display_name={"ru": "NSGifts Wholesale", "en": "NSGifts Wholesale"},
     description={
         "ru": "Оптовые подарочные карты через IP вашего Buywell Edge",
@@ -340,7 +352,7 @@ async def _order_info(client: NSGiftsClient, custom_id: str) -> dict[str, Any]:
 
 
 @extension.operation(
-    "adapter.ns-gifts/stock-11111111",
+    "adapter.ns-gifts/action-11111111",
     "1.0.0",
     input_model=StockInput,
     output_model=ProviderOutput,
@@ -351,7 +363,7 @@ async def stock(context: Any, _input: StockInput) -> dict[str, Any]:
 
 
 @extension.operation(
-    "adapter.ns-gifts/create-order-22222222",
+    "adapter.ns-gifts/action-22222222",
     "1.0.0",
     input_model=CreateOrderInput,
     output_model=ProviderOutput,
@@ -377,7 +389,7 @@ async def create_order(context: Any, value: CreateOrderInput) -> dict[str, Any]:
 
 
 @extension.operation(
-    "adapter.ns-gifts/pay-order-33333333",
+    "adapter.ns-gifts/action-33333333",
     "1.0.0",
     input_model=PayOrderInput,
     output_model=ProviderOutput,
@@ -420,7 +432,7 @@ async def pay_order(context: Any, value: PayOrderInput) -> dict[str, Any]:
 
 
 @extension.operation(
-    "adapter.ns-gifts/order-info-44444444",
+    "adapter.ns-gifts/action-44444444",
     "1.0.0",
     input_model=OrderInfoInput,
     output_model=ProviderOutput,
@@ -431,7 +443,59 @@ async def order_info(context: Any, value: OrderInfoInput) -> dict[str, Any]:
 
 
 @extension.operation(
-    "adapter.ns-gifts/fulfill-order-55555555",
+    "adapter.ns-gifts/action-66666666",
+    "1.0.0",
+    input_model=EmptyInput,
+    output_model=ProviderOutput,
+    display_name={"ru": "Проверить баланс", "en": "Check balance"},
+)
+async def check_balance(context: Any, _input: EmptyInput) -> dict[str, Any]:
+    return await _client(context).request("GET", "/api/v2/check_balance")
+
+
+@extension.operation(
+    "adapter.ns-gifts/action-77777777",
+    "1.0.0",
+    input_model=ExchangeRateInput,
+    output_model=ProviderOutput,
+    display_name={"ru": "Рассчитать курс", "en": "Calculate exchange rate"},
+)
+async def exchange_rate(context: Any, value: ExchangeRateInput) -> dict[str, Any]:
+    return await _client(context).request(
+        "POST",
+        "/api/v2/exchange_rate",
+        json_body={"service_id": value.service_id},
+    )
+
+
+@extension.operation(
+    "adapter.ns-gifts/steam-88888888",
+    "1.0.0",
+    input_model=SteamUserInput,
+    output_model=ProviderOutput,
+    display_name={"ru": "Проверить Steam-пользователя", "en": "Check Steam user"},
+)
+async def check_steam_user(context: Any, value: SteamUserInput) -> dict[str, Any]:
+    return await _client(context).request(
+        "POST",
+        "/api/v2/steam/check_user",
+        json_body={"steam_id": value.steam_id},
+    )
+
+
+@extension.operation(
+    "adapter.ns-gifts/steam-gifts-99999999",
+    "1.0.0",
+    input_model=EmptyInput,
+    output_model=ProviderOutput,
+    display_name={"ru": "Каталог Steam Gifts", "en": "Steam Gifts catalog"},
+)
+async def steam_gifts_catalog(context: Any, _input: EmptyInput) -> dict[str, Any]:
+    return await _client(context).request("GET", "/api/v2/steam_gift/get_apps")
+
+
+@extension.operation(
+    "adapter.ns-gifts/action-55555555",
     "1.0.0",
     input_model=FulfillOrderInput,
     output_model=ProviderOutput,

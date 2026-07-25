@@ -1,3 +1,8 @@
+# 1.0.3
+
+- The driver now implements all nine actions in the published NSGifts adapter, including balance, exchange rate, and Steam Gifts.
+- Contract identifiers now exactly match the Buywell Automation nodes.
+
 # 1.0.2
 
 - NSGifts requests now consistently use the Edge server's outgoing IPv4 address, matching the address added to the provider whitelist.
