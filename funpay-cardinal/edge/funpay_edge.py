@@ -6,6 +6,8 @@ import html
 import json
 import re
 import sys
+import threading
+import time
 import urllib.parse
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -49,7 +51,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.1",
+    version="1.3.2",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
@@ -81,13 +83,62 @@ extension = module(
 class ConnectionState:
     account: Account | None = None
     runner: Runner | None = None
+    runner_thread: threading.Thread | None = None
     task: asyncio.Task[None] | None = None
     error: Exception | None = None
     last_success_at: str | None = None
+    last_success_monotonic: float | None = None
+    poll_interval_seconds: float = 6
     pending_inputs: dict[str, asyncio.Future[str]] = field(default_factory=dict)
 
 
 _states: dict[str, ConnectionState] = {}
+
+
+def _mark_success(state: ConnectionState) -> None:
+    state.error = None
+    state.last_success_at = datetime.now(UTC).isoformat()
+    state.last_success_monotonic = time.monotonic()
+
+
+class _ObservedRunner(Runner):
+    def __init__(self, account: Account, state: ConnectionState):
+        super().__init__(account)
+        self._state = state
+
+    def get_updates(self) -> dict:
+        try:
+            updates = super().get_updates()
+        except Exception as error:
+            self._state.error = error
+            raise
+        _mark_success(self._state)
+        return updates
+
+
+def _start_runner(
+    account: Account,
+    state: ConnectionState,
+    connection_id: str,
+) -> _ObservedRunner:
+    runner = _ObservedRunner(account, state)
+    thread = threading.Thread(
+        target=runner.loop,
+        name=f"funpay-runner-{connection_id}",
+        daemon=True,
+    )
+    state.runner = runner
+    state.runner_thread = thread
+    thread.start()
+    return runner
+
+
+def _error_message(error: Exception | None, fallback: str) -> str:
+    if error is None:
+        return fallback
+    short_str = getattr(error, "short_str", None)
+    value = short_str() if callable(short_str) else str(error)
+    return str(value)[:500] or fallback
 
 
 def _enum_slug(value: Any) -> str:
@@ -231,13 +282,12 @@ async def _run(session: Any, state: ConnectionState) -> None:
             )
             await asyncio.to_thread(account.get)
             state.account = account
-            state.runner = Runner(account)
-            state.error = None
-            state.last_success_at = datetime.now(UTC).isoformat()
-            iterator = state.runner.listen(config.poll_interval_seconds, ignore_exceptions=False)
+            state.poll_interval_seconds = config.poll_interval_seconds
+            _mark_success(state)
+            runner = _start_runner(account, state, session.connection_id)
+            iterator = runner.listen(config.poll_interval_seconds, ignore_exceptions=True)
             while True:
                 event = await asyncio.to_thread(next, iterator)
-                state.last_success_at = datetime.now(UTC).isoformat()
                 await _emit_event(session, state, event)
         except asyncio.CancelledError:
             raise
@@ -245,6 +295,7 @@ async def _run(session: Any, state: ConnectionState) -> None:
             state.error = error
             state.account = None
             state.runner = None
+            state.runner_thread = None
             await asyncio.sleep(10 if isinstance(error, UnauthorizedError) else 5)
 
 
@@ -267,12 +318,23 @@ async def stop(session: Any) -> None:
 @extension.health
 async def health(session: Any) -> Health:
     state = _states.get(session.connection_id)
+    if state and isinstance(state.error, UnauthorizedError):
+        return Health(state=HealthState.AUTH_REQUIRED, message="Sign in to FunPay again")
     if not state or not state.account:
-        if state and isinstance(state.error, UnauthorizedError):
-            return Health(state=HealthState.AUTH_REQUIRED, message="Sign in to FunPay again")
         return Health(
             state=HealthState.DEGRADED,
-            message=str(state.error)[:500] if state and state.error else "Connecting to FunPay",
+            message=_error_message(state.error, "Connecting to FunPay") if state else "Connecting to FunPay",
+        )
+    stale_after = max(90.0, state.poll_interval_seconds * 5)
+    if (
+        state.error is not None
+        or state.last_success_monotonic is None
+        or time.monotonic() - state.last_success_monotonic > stale_after
+    ):
+        return Health(
+            state=HealthState.DEGRADED,
+            message=_error_message(state.error, "FunPay event polling is not responding"),
+            last_success_at=state.last_success_at,
         )
     return Health(state=HealthState.HEALTHY, last_success_at=state.last_success_at)
 
