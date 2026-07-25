@@ -1,3 +1,7 @@
+# 1.3.1 Edge
+
+- Interactive Edge setup now reads Russian and English field labels from the FunPay package.
+
 # 1.3.0 Edge
 
 - Preserves the complete Cardinal module 1.3.0 manifest and contract.

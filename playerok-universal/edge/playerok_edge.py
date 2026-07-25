@@ -17,25 +17,40 @@ from edge.vendor.playerokapi.exceptions import (
 )
 from edge.vendor.playerokapi.listener.listener import EventListener
 
-from buywell_edge_sdk import Health, HealthState, module
+from buywell_edge_sdk import Health, HealthState, configuration_field, module
 
 
 class PlayerokConfiguration(BaseModel):
-    token: SecretStr | None = Field(
+    token: SecretStr | None = configuration_field(
+        label={"ru": "Токен аккаунта", "en": "Account token"},
         default=None,
         description="Playerok account token used by existing Playerok Universal setups",
     )
-    ddg5: SecretStr | None = Field(
+    ddg5: SecretStr | None = configuration_field(
+        label={"ru": "Cookie __ddg5_", "en": "__ddg5_ cookie"},
         default=None,
         description="Optional __ddg5_ cookie bound to the same IP and User-Agent",
     )
-    cookies: SecretStr | None = Field(
+    cookies: SecretStr | None = configuration_field(
+        label={"ru": "Cookie аккаунта", "en": "Account cookies"},
         default=None,
         description="Full Playerok Cookie header; an alternative to token and ddg5",
     )
-    user_agent: str = Field(min_length=20, max_length=1_000)
-    proxy: SecretStr | None = None
-    request_timeout_seconds: int = Field(default=30, ge=5, le=120)
+    user_agent: str = configuration_field(
+        label={"ru": "User-Agent браузера", "en": "Browser User-Agent"},
+        min_length=20,
+        max_length=1_000,
+    )
+    proxy: SecretStr | None = configuration_field(
+        label={"ru": "Прокси", "en": "Proxy"},
+        default=None,
+    )
+    request_timeout_seconds: int = configuration_field(
+        label={"ru": "Тайм-аут запросов, секунд", "en": "Request timeout, seconds"},
+        default=30,
+        ge=5,
+        le=120,
+    )
 
     @model_validator(mode="after")
     def require_session(self) -> "PlayerokConfiguration":
@@ -50,7 +65,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="playerok.universal",
-    version="1.0.4",
+    version="1.0.5",
     display_name={"ru": "Playerok", "en": "Playerok"},
     description={
         "ru": "Продажи и сообщения Playerok без Playerok Universal и Telegram-бота",

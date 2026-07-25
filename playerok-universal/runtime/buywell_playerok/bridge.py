@@ -20,7 +20,7 @@ from .state import RuntimeState
 
 
 MODULE_ID = "playerok.universal"
-MODULE_VERSION = "1.0.4"
+MODULE_VERSION = "1.0.5"
 PURCHASE_EVENT = "commerce.purchase.created"
 MESSAGE_EVENT = "messaging.message.received"
 EVENT_VERSION = "1.0.0"

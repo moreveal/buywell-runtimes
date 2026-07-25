@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "funpay.cardinal",
-    "version": "1.3.0",
+    "version": "1.3.1",
     "displayName": "FunPay Cardinal",
     "description": "Получает события FunPay и выполняет действия сценариев Buywell через Cardinal.",
     "publisher": "Buywell",

@@ -24,13 +24,23 @@ from FunPayAPI.updater.events import NewMessageEvent, NewOrderEvent, OrderStatus
 from FunPayAPI.updater.runner import Runner
 from pydantic import BaseModel, Field, SecretStr
 
-from buywell_edge_sdk import Health, HealthState, module
+from buywell_edge_sdk import Health, HealthState, configuration_field, module
 
 
 class FunPayConfiguration(BaseModel):
-    golden_key: SecretStr
-    user_agent: str | None = None
-    poll_interval_seconds: float = Field(default=6, ge=2, le=60)
+    golden_key: SecretStr = configuration_field(
+        label={"ru": "Golden Key (cookie аккаунта FunPay)", "en": "Golden Key (FunPay account cookie)"},
+    )
+    user_agent: str | None = configuration_field(
+        label={"ru": "User-Agent браузера", "en": "Browser User-Agent"},
+        default=None,
+    )
+    poll_interval_seconds: float = configuration_field(
+        label={"ru": "Интервал проверки, секунд", "en": "Polling interval, seconds"},
+        default=6,
+        ge=2,
+        le=60,
+    )
 
 
 class SendMessageInput(BaseModel):
@@ -39,7 +49,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.0",
+    version="1.3.1",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",

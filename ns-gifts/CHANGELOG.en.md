@@ -1,3 +1,7 @@
+# 1.0.1
+
+- Interactive Edge setup now reads Russian and English field labels from the NSGifts package.
+
 # 1.0.0
 
 - Initial Edge-only NSGifts driver.

@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "playerok.universal",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "displayName": "Playerok Universal",
     "description": "Передаёт продажи и сообщения Playerok в сценарии Buywell и отправляет ответы покупателям.",
     "publisher": "Buywell",
@@ -21,8 +21,8 @@
       "icon": "assets/playerok-icon.png"
     },
     "artifact": {
-      "path": "runtime/playerok-universal-runtime-1.0.4.zip",
-      "filename": "playerok-universal-runtime-1.0.4.zip"
+      "path": "runtime/playerok-universal-runtime-1.0.5.zip",
+      "filename": "playerok-universal-runtime-1.0.5.zip"
     },
     "guides": {
       "installation": {

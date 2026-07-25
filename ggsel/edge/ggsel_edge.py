@@ -10,16 +10,36 @@ from typing import Any
 
 from pydantic import BaseModel, Field, SecretStr
 
-from buywell_edge_sdk import Health, HealthState, module
+from buywell_edge_sdk import Health, HealthState, configuration_field, module
 from runtime.ggsel_runtime import ApiError, Config, GGSelClient, _catalog_result, _clean, _purchase_event
 
 
 class GGSelConfiguration(BaseModel):
-    seller_id: int = Field(gt=0)
-    api_key: SecretStr
-    poll_interval_seconds: float = Field(default=30, ge=5, le=3600)
-    message_poll_interval_seconds: float = Field(default=10, ge=2, le=3600)
-    sales_window: int = Field(default=100, ge=1, le=1000)
+    seller_id: int = configuration_field(
+        label={"ru": "ID продавца", "en": "Seller ID"},
+        gt=0,
+    )
+    api_key: SecretStr = configuration_field(
+        label={"ru": "API-ключ", "en": "API key"},
+    )
+    poll_interval_seconds: float = configuration_field(
+        label={"ru": "Интервал проверки продаж, секунд", "en": "Sales polling interval, seconds"},
+        default=30,
+        ge=5,
+        le=3600,
+    )
+    message_poll_interval_seconds: float = configuration_field(
+        label={"ru": "Интервал проверки сообщений, секунд", "en": "Message polling interval, seconds"},
+        default=10,
+        ge=2,
+        le=3600,
+    )
+    sales_window: int = configuration_field(
+        label={"ru": "Количество проверяемых продаж", "en": "Sales lookup window"},
+        default=100,
+        ge=1,
+        le=1000,
+    )
 
 
 class SendMessageInput(BaseModel):
@@ -28,7 +48,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="ggsel.seller",
-    version="1.2.3",
+    version="1.2.4",
     display_name={"ru": "GGSel", "en": "GGSel"},
     description={
         "ru": "Продажи, сообщения и каталог GGSel через Buywell Edge",

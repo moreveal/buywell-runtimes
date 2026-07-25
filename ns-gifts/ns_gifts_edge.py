@@ -19,18 +19,29 @@ from urllib.parse import urlencode
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from buywell_edge_sdk import Health, HealthState, adapter_driver
+from buywell_edge_sdk import Health, HealthState, adapter_driver, configuration_field
 
 BASE_URL = "https://api.ns.gifts"
 TERMINAL_STATUSES = {2: "completed", 5: "canceled", 7: "refunded"}
 
 
 class NSGiftsConfiguration(BaseModel):
-    user_id: SecretStr
-    login: SecretStr
-    password: SecretStr
-    api_secret: SecretStr
-    totp_secret: SecretStr | None = None
+    user_id: SecretStr = configuration_field(
+        label={"ru": "ID пользователя", "en": "User ID"},
+    )
+    login: SecretStr = configuration_field(
+        label={"ru": "Логин", "en": "Login"},
+    )
+    password: SecretStr = configuration_field(
+        label={"ru": "Пароль", "en": "Password"},
+    )
+    api_secret: SecretStr = configuration_field(
+        label={"ru": "Секрет API", "en": "API secret"},
+    )
+    totp_secret: SecretStr | None = configuration_field(
+        label={"ru": "Секрет TOTP", "en": "TOTP secret"},
+        default=None,
+    )
 
 
 class DynamicField(BaseModel):
@@ -260,7 +271,7 @@ class NSGiftsClient:
 
 extension = adapter_driver(
     extension_id="adapter.ns-gifts",
-    version="1.0.0",
+    version="1.0.1",
     display_name={"ru": "NSGifts Wholesale", "en": "NSGifts Wholesale"},
     description={
         "ru": "Оптовые подарочные карты через IP вашего Buywell Edge",

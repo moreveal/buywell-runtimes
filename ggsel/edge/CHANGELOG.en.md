@@ -1,3 +1,7 @@
+# 1.2.4 Edge
+
+- Interactive Edge setup now reads Russian and English field labels from the GGSel package.
+
 # 1.2.3 Edge
 
 - Preserves the published GGSel 1.2.3 contract.
