@@ -174,6 +174,29 @@ class FunPayOrderPayloadTests(unittest.TestCase):
 
 
 class FunPayInputResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_same_platform_message_is_consumed_only_once(self) -> None:
+        state = module.ConnectionState(account=SimpleNamespace(id=10385604))
+
+        class Message:
+            by_bot = False
+            author_id = 20724137
+            type = module.MessageTypes.NON_SYSTEM
+            chat_id = 276588969
+            id = 123
+            author = "buyer"
+
+            def __str__(self) -> str:
+                return "https://discord.gg/example"
+
+        session = SimpleNamespace(capture_specification=None)
+        await module._emit_event(session, state, module.NewMessageEvent("test", Message()))
+        await module._emit_event(session, state, module.NewMessageEvent("test", Message()))
+
+        buffered = state.recent_messages["users-10385604-20724137"]
+        self.assertEqual(len(buffered), 1)
+        self.assertEqual(buffered[0][0], 123)
+        self.assertEqual(buffered[0][2], "https://discord.gg/example")
+
     async def test_recent_message_resolves_later_input_without_prompt(self) -> None:
         sent: list[tuple[str, str]] = []
         state = module.ConnectionState(

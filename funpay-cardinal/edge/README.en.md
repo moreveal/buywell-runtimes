@@ -6,5 +6,5 @@ the `golden_key` and optional User-Agent locally with
 to Buywell.
 
 Events, actions, catalogs, and versions match the published
-`funpay.cardinal@1.3.6`; new connections do not need Cardinal or a Telegram
+`funpay.cardinal@1.3.7`; new connections do not need Cardinal or a Telegram
 bot. A logged-out session becomes “sign-in required”.

@@ -56,7 +56,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.6",
+    version="1.3.7",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
@@ -103,12 +103,29 @@ class ConnectionState:
     poll_interval_seconds: float = 6
     pending_inputs: dict[str, PendingInput] = field(default_factory=dict)
     recent_messages: dict[str, list[tuple[int, float, str]]] = field(default_factory=dict)
+    seen_message_ids: dict[int, float] = field(default_factory=dict)
 
 
 _states: dict[str, ConnectionState] = {}
 
 _RECENT_MESSAGE_TTL_SECONDS = 600.0
 _RECENT_MESSAGE_LIMIT = 50
+
+
+def _accept_message_once(state: ConnectionState, message_id: int) -> bool:
+    if message_id <= 0:
+        return True
+    now = time.monotonic()
+    cutoff = now - _RECENT_MESSAGE_TTL_SECONDS
+    state.seen_message_ids = {
+        seen_id: observed_at
+        for seen_id, observed_at in state.seen_message_ids.items()
+        if observed_at >= cutoff
+    }
+    if message_id in state.seen_message_ids:
+        return False
+    state.seen_message_ids[message_id] = now
+    return True
 
 
 def _remember_message(state: ConnectionState, conversation: str, message_id: int, text: str) -> None:
@@ -371,6 +388,8 @@ async def _emit_event(session: Any, state: ConnectionState, event: Any) -> None:
     if not text:
         return
     message_id = int(getattr(message, "id", 0) or 0)
+    if not _accept_message_once(state, message_id):
+        return
     conversation_keys = [str(message.chat_id)]
     author_id = getattr(message, "author_id", None)
     if author_id not in (None, 0) and account.id not in (None, 0):

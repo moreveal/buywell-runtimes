@@ -1,3 +1,7 @@
+# 1.3.7 Edge
+
+- A buyer message can now be consumed only once even when FunPay delivers it both as a new-message event and a last-chat-message change. A retry no longer exhausts every attempt on the same response.
+
 # 1.3.6 Edge
 
 - Input retries now send the configured invalid-response message; the Buywell server canonically enforces hosts, paths, and all other response constraints.
