@@ -28,7 +28,7 @@ except ImportError as error:  # pragma: no cover - exercised by the install guid
 
 
 MODULE_ID = "ggsel.seller"
-MODULE_VERSION = "1.2.5"
+MODULE_VERSION = "1.2.6"
 PROTOCOL_VERSION = "1.0.0"
 BINDING_CATALOG_PROTOCOL_VERSION = "1.0.0"
 PURCHASE_EVENT = "commerce.purchase.created"

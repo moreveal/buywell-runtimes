@@ -48,7 +48,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="ggsel.seller",
-    version="1.2.5",
+    version="1.2.6",
     display_name={"ru": "GGSel", "en": "GGSel"},
     description={
         "ru": "Продажи, сообщения и каталог GGSel через Buywell Edge",
@@ -345,7 +345,7 @@ async def collect_input(context: Any, job: dict[str, Any]) -> str:
     future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
     state.pending_inputs[conversation] = future
     try:
-        prompt = str(collection.get("prompt") or "")
+        prompt = str(collection.get("invalidResponse") if int(job.get("deliveryAttempt") or 1) > 1 else collection.get("prompt") or "")
         if prompt:
             await asyncio.to_thread(state.client.send_message, int(conversation), prompt)
         return await asyncio.wait_for(

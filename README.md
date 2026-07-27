@@ -9,8 +9,8 @@ explicitly.
 
 | Runtime | Edge-native package | Capabilities |
 | --- | --- | --- |
-| [GGSel Seller](ggsel/) | `ggsel.seller@1.2.5` | New purchases, buyer messages, replies and product catalog |
-| [FunPay](funpay-cardinal/) | `funpay.cardinal@1.3.5` | Orders, status changes, messages, replies and buyer input |
+| [GGSel Seller](ggsel/) | `ggsel.seller@1.2.6` | New purchases, buyer messages, replies and product catalog |
+| [FunPay](funpay-cardinal/) | `funpay.cardinal@1.3.6` | Orders, status changes, messages, replies and buyer input |
 | [Playerok](playerok-universal/) | `playerok.universal@1.0.5` | Paid sales, buyer messages, contextual replies and category/item catalogs |
 | [NSGifts](ns-gifts/) | `adapter.ns-gifts@1.0.6` | Edge-required wholesale adapter, signing, TOTP, IP-whitelist diagnostics and live stock catalog |
 

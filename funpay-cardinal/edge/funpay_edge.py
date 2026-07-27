@@ -56,7 +56,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.5",
+    version="1.3.6",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
@@ -669,7 +669,7 @@ async def collect_input(context: Any, job: dict[str, Any]) -> str:
         )
         state.pending_inputs[conversation] = pending
     try:
-        prompt = str(collection.get("prompt") or "")
+        prompt = str(collection.get("invalidResponse") if int(job.get("deliveryAttempt") or 1) > 1 else collection.get("prompt") or "")
         if created and prompt:
             await asyncio.to_thread(
                 state.account.send_message,

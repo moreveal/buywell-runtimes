@@ -1,3 +1,7 @@
+# 1.2.6 Edge
+
+- Input retries now send the configured invalid-response message; the Buywell server canonically enforces every response constraint.
+
 # 1.2.5 Edge
 
 - Every discovered sale is now registered for message polling immediately, matching the previous runtime; buyer replies no longer depend on the chat separately appearing in the unread list.

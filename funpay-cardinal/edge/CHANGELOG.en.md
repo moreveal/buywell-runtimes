@@ -1,3 +1,7 @@
+# 1.3.6 Edge
+
+- Input retries now send the configured invalid-response message; the Buywell server canonically enforces hosts, paths, and all other response constraints.
+
 # 1.3.5 Edge
 
 - Order events now include dynamic listing parameters (`period`, delivery method, and other category fields), allowing configured input mappings to receive the purchased variant value.
