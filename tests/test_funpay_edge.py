@@ -102,6 +102,51 @@ class FunPayHealthTests(unittest.IsolatedAsyncioTestCase):
 
 
 class FunPayInputResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_recent_message_resolves_later_input_without_prompt(self) -> None:
+        sent: list[tuple[str, str]] = []
+        state = module.ConnectionState(
+            account=SimpleNamespace(
+                id=10385604,
+                send_message=lambda conversation, prompt, **_: sent.append((conversation, prompt)) or True,
+            )
+        )
+
+        class Message:
+            by_bot = False
+            author_id = 20724137
+            type = module.MessageTypes.NON_SYSTEM
+            chat_id = 276588969
+            id = 123
+            author = "buyer"
+
+            def __str__(self) -> str:
+                return "https://discord.gg/example"
+
+        await module._emit_event(
+            SimpleNamespace(capture_specification=None),
+            state,
+            module.NewMessageEvent("test", Message()),
+        )
+
+        module._states["connection"] = state
+        try:
+            result = await module.collect_input(
+                SimpleNamespace(connection_id="connection"),
+                {
+                    "idempotencyKey": "execution:url",
+                    "collection": {
+                        "conversationKey": "users-10385604-20724137",
+                        "prompt": "Send URL",
+                        "timeoutSeconds": 60,
+                    },
+                },
+            )
+        finally:
+            module._states.clear()
+
+        self.assertEqual(result, "https://discord.gg/example")
+        self.assertEqual(sent, [])
+
     async def test_participant_conversation_key_resolves_input(self) -> None:
         state = module.ConnectionState(account=SimpleNamespace(id=10385604))
         future = asyncio.get_running_loop().create_future()

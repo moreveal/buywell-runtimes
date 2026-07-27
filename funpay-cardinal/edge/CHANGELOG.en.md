@@ -1,3 +1,7 @@
+# 1.3.4 Edge
+
+- When a buyer replies right after purchase before the question appears in chat, input waits now use that fresh message and avoid sending an extra repeated prompt.
+
 # 1.3.3 Edge
 
 - Buyer replies are now matched by both chat ID and conversation participants, consistent with the proven Cardinal runtime behavior.
