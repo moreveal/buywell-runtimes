@@ -22,7 +22,12 @@ if str(_VENDOR_ROOT) not in sys.path:
 from FunPayAPI import Account
 from FunPayAPI.common.enums import MessageTypes, OrderStatuses
 from FunPayAPI.common.exceptions import UnauthorizedError
-from FunPayAPI.updater.events import NewMessageEvent, NewOrderEvent, OrderStatusChangedEvent
+from FunPayAPI.updater.events import (
+    LastChatMessageChangedEvent,
+    NewMessageEvent,
+    NewOrderEvent,
+    OrderStatusChangedEvent,
+)
 from FunPayAPI.updater.runner import Runner
 from pydantic import BaseModel, Field, SecretStr
 
@@ -51,7 +56,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.4",
+    version="1.3.5",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
@@ -193,6 +198,33 @@ def _clean(value: Any) -> Any:
     return value
 
 
+def _find_lot(account: Account, order: Any) -> str | None:
+    try:
+        profile = account.get_user(int(account.id))
+        lots = profile.get_sorted_lots(2).get(order.subcategory, {}).values()
+        for lot in sorted(
+            lots,
+            key=lambda item: len(
+                ", ".join(
+                    value
+                    for value in (item.server, item.side, item.description)
+                    if value
+                )
+            ),
+            reverse=True,
+        ):
+            description = ", ".join(
+                value
+                for value in (lot.server, lot.side, lot.description)
+                if value
+            )
+            if description and description in str(getattr(order, "description", "")):
+                return str(lot.id)
+    except Exception:
+        return None
+    return None
+
+
 def _captured(session: Any, event_type: str, event_version: str) -> bool:
     specification = session.capture_specification
     if not specification:
@@ -210,6 +242,8 @@ def _order_payload(account: Account, shortcut: Any) -> tuple[dict[str, Any], dic
         order = shortcut
     subcategory = getattr(order, "subcategory", None)
     category = getattr(subcategory, "category", None)
+    lot_id = _find_lot(account, order)
+    review = getattr(order, "review", None)
     payload = _clean({
         "orderId": str(order.id),
         "status": _enum_slug(order.status),
@@ -230,7 +264,27 @@ def _order_payload(account: Account, shortcut: Any) -> tuple[dict[str, Any], dic
         "price": getattr(order, "sum", None) or getattr(shortcut, "price", None),
         "currency": _enum_slug(getattr(order, "currency", "unknown")),
         "categoryId": str(getattr(subcategory, "id", "")) or None,
+        "lotId": lot_id,
         "player": getattr(order, "player", None),
+        "server": {
+            "id": getattr(getattr(order, "server", None), "id", None),
+            "name": getattr(getattr(order, "server", None), "name", None),
+        } if getattr(order, "server", None) else None,
+        "side": {
+            "id": getattr(getattr(order, "side", None), "id", None),
+            "name": getattr(getattr(order, "side", None), "name", None),
+        } if getattr(order, "side", None) else None,
+        "review": {
+            "stars": getattr(review, "stars", None),
+            "text": getattr(review, "text", None),
+            "reply": getattr(review, "reply", None),
+            "anonymous": getattr(review, "anonymous", None),
+            "hidden": getattr(review, "hidden", None),
+            "author": getattr(review, "author", None),
+            "authorId": getattr(review, "author_id", None),
+            "byBot": getattr(review, "by_bot", None),
+            "replyByBot": getattr(review, "reply_by_bot", None),
+        } if review else None,
         "subcategory": {
             "id": str(getattr(subcategory, "id", "")) or None,
             "name": getattr(subcategory, "name", None),
@@ -242,11 +296,24 @@ def _order_payload(account: Account, shortcut: Any) -> tuple[dict[str, Any], dic
             },
         } if subcategory else None,
     })
+    lot_fields: dict[str, Any] = {}
+    for key in getattr(order, "fields", {}):
+        if key in ("summary", "desc", "payment_msg"):
+            continue
+        value = order.get_field_value_any(key)
+        if value is None:
+            continue
+        lot_fields[str(key)] = (
+            value if isinstance(value, (str, int, float, bool)) else str(value)
+        )
+    if lot_fields:
+        payload["lotFields"] = lot_fields
     scope = _clean({
         "orderId": str(order.id),
         "chatId": getattr(order, "chat_id", None),
         "buyerId": getattr(order, "buyer_id", None),
         "buyerUsername": getattr(order, "buyer_username", None),
+        "lotId": lot_id,
         "categoryId": payload.get("categoryId"),
         "title": payload.get("title"),
     })
@@ -277,9 +344,23 @@ async def _emit_event(session: Any, state: ConnectionState, event: Any) -> None:
             event_id=f"funpay:{account.id}:order:{event.order.id}:{payload['status']}",
         )
         return
-    if not isinstance(event, NewMessageEvent):
+    if isinstance(event, LastChatMessageChangedEvent):
+        chat = event.chat
+        history = await asyncio.to_thread(
+            account.get_chat_history,
+            chat.id,
+            interlocutor_username=chat.name,
+        )
+        message = next(
+            (item for item in reversed(history) if item.id == chat.node_msg_id),
+            None,
+        )
+        if message is None:
+            return
+    elif isinstance(event, NewMessageEvent):
+        message = event.message
+    else:
         return
-    message = event.message
     if (
         getattr(message, "by_bot", False)
         or getattr(message, "author_id", 0) in (0, account.id)

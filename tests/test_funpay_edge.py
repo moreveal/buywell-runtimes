@@ -101,6 +101,78 @@ class FunPayHealthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.last_success_at, state.last_success_at)
 
 
+class FunPayOrderPayloadTests(unittest.TestCase):
+    def test_dynamic_lot_fields_are_emitted_with_the_purchase(self) -> None:
+        order = SimpleNamespace(
+            id="SZTD7WTZ",
+            status=SimpleNamespace(name="PAID"),
+            fields={"summary": object(), "period": object(), "method": object()},
+            get_field_value_any=lambda key: {
+                "period": "1 месяц",
+                "method": "Ссылкой",
+            }.get(key),
+            description="Discord Boost, 1 месяц, Ссылкой",
+            subcategory=SimpleNamespace(
+                id=1334,
+                name="Discord",
+                fullname="Discord Boost",
+                type=SimpleNamespace(name="COMMON"),
+                category=SimpleNamespace(id=12, name="Social"),
+            ),
+        )
+        shortcut = SimpleNamespace(id="SZTD7WTZ", date=None, amount=4, price=1)
+        profile = SimpleNamespace(
+            get_sorted_lots=lambda _: SimpleNamespace(
+                get=lambda *_: {
+                    73104640: SimpleNamespace(
+                        id=73104640,
+                        server=None,
+                        side=None,
+                        description="Discord Boost",
+                    )
+                },
+            )
+        )
+        source = SimpleNamespace(
+            id=10385604,
+            get_order=lambda _: order,
+            get_user=lambda _: profile,
+        )
+
+        payload, _ = module._order_payload(source, shortcut)
+
+        self.assertEqual(
+            payload["lotFields"],
+            {"period": "1 месяц", "method": "Ссылкой"},
+        )
+        self.assertEqual(payload["lotId"], "73104640")
+
+    def test_order_details_preserve_server_side_and_review(self) -> None:
+        review = SimpleNamespace(stars=5, text="ok", reply=None)
+        order = SimpleNamespace(
+            id="ORDER",
+            status=SimpleNamespace(name="PAID"),
+            fields={},
+            subcategory=None,
+            server=SimpleNamespace(id=1, name="EU"),
+            side=SimpleNamespace(id=2, name="Alliance"),
+            review=review,
+        )
+        source = SimpleNamespace(
+            id=1,
+            get_order=lambda _: order,
+            get_user=lambda _: SimpleNamespace(
+                get_sorted_lots=lambda _: SimpleNamespace(get=lambda *_: {})
+            ),
+        )
+
+        payload, _ = module._order_payload(source, SimpleNamespace(id="ORDER"))
+
+        self.assertEqual(payload["server"], {"id": 1, "name": "EU"})
+        self.assertEqual(payload["side"], {"id": 2, "name": "Alliance"})
+        self.assertEqual(payload["review"]["stars"], 5)
+
+
 class FunPayInputResolverTests(unittest.IsolatedAsyncioTestCase):
     async def test_recent_message_resolves_later_input_without_prompt(self) -> None:
         sent: list[tuple[str, str]] = []

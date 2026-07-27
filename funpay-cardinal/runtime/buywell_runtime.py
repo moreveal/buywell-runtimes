@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from cardinal import Cardinal
 
 NAME = "Buywell"
-VERSION = "1.3.4"
+VERSION = "1.3.5"
 PURCHASE_EVENT_VERSION = "1.3.0"
 DESCRIPTION = "Связывает FunPay Cardinal с вашими сценариями Buywell."
 CREDITS = "Buywell"

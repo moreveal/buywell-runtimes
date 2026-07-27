@@ -5,4 +5,4 @@ and a local Seller API V1 key. The separate GGSel app, service scripts, and a
 Buywell connection key are no longer required.
 
 Events, actions, and the catalog remain compatible with
-`ggsel.seller@1.2.4`.
+`ggsel.seller@1.2.5`.

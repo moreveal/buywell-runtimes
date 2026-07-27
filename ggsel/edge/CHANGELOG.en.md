@@ -1,3 +1,7 @@
+# 1.2.5 Edge
+
+- Every discovered sale is now registered for message polling immediately, matching the previous runtime; buyer replies no longer depend on the chat separately appearing in the unread list.
+
 # 1.2.4 Edge
 
 - Interactive Edge setup now reads Russian and English field labels from the GGSel package.

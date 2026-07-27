@@ -1,3 +1,7 @@
+# 1.3.5 Edge
+
+- Order events now include dynamic listing parameters (`period`, delivery method, and other category fields), allowing configured input mappings to receive the purchased variant value.
+
 # 1.3.4 Edge
 
 - When a buyer replies right after purchase before the question appears in chat, input waits now use that fresh message and avoid sending an extra repeated prompt.

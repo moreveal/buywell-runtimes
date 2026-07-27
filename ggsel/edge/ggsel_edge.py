@@ -48,7 +48,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="ggsel.seller",
-    version="1.2.4",
+    version="1.2.5",
     display_name={"ru": "GGSel", "en": "GGSel"},
     description={
         "ru": "Продажи, сообщения и каталог GGSel через Buywell Edge",
@@ -153,7 +153,11 @@ def _poll_sales(state: ConnectionState) -> list[tuple[str, str, dict[str, Any], 
             invoice_id = int(sale.get("invoice_id"))
         except (TypeError, ValueError):
             continue
-        if invoice_id <= 0 or not state.storage.remember_purchase(str(invoice_id)) or not initialized:
+        if invoice_id <= 0:
+            continue
+        is_new = state.storage.remember_purchase(str(invoice_id))
+        state.storage.remember_chat(invoice_id)
+        if not is_new or not initialized:
             continue
         payload, scope = _purchase_event(
             state.config,
