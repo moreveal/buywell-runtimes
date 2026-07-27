@@ -1,3 +1,9 @@
+# 1.3.3 Edge
+
+- Buyer replies are now matched by both chat ID and conversation participants, consistent with the proven Cardinal runtime behavior.
+- Redelivery of the same wait after reconnect does not send the question twice and continues waiting for the same reply.
+- An expired wait now returns a clear error instead of an empty message.
+
 # 1.3.2 Edge
 
 - Starts the FunPay Runner worker loop so order and message polling actually runs.

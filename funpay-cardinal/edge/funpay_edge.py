@@ -51,7 +51,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.2",
+    version="1.3.3",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
@@ -80,6 +80,13 @@ extension = module(
 
 
 @dataclass
+class PendingInput:
+    idempotency_key: str
+    future: asyncio.Future[str]
+    deadline: float
+
+
+@dataclass
 class ConnectionState:
     account: Account | None = None
     runner: Runner | None = None
@@ -89,7 +96,7 @@ class ConnectionState:
     last_success_at: str | None = None
     last_success_monotonic: float | None = None
     poll_interval_seconds: float = 6
-    pending_inputs: dict[str, asyncio.Future[str]] = field(default_factory=dict)
+    pending_inputs: dict[str, PendingInput] = field(default_factory=dict)
 
 
 _states: dict[str, ConnectionState] = {}
@@ -250,11 +257,19 @@ async def _emit_event(session: Any, state: ConnectionState, event: Any) -> None:
     text = str(message).strip()
     if not text:
         return
-    conversation = str(message.chat_id)
-    pending = state.pending_inputs.get(conversation)
-    if pending and not pending.done():
-        pending.set_result(text)
-        return
+    conversation_keys = [str(message.chat_id)]
+    author_id = getattr(message, "author_id", None)
+    if author_id not in (None, 0) and account.id not in (None, 0):
+        participant_key = "users-" + "-".join(
+            str(value) for value in sorted((int(author_id), int(account.id)))
+        )
+        if participant_key not in conversation_keys:
+            conversation_keys.append(participant_key)
+    for conversation in conversation_keys:
+        pending = state.pending_inputs.get(conversation)
+        if pending and not pending.future.done():
+            pending.future.set_result(text)
+            return
     if not _captured(session, "messaging.message.received", "1.0.0"):
         return
     await session.emit_event(
@@ -519,22 +534,39 @@ async def collect_input(context: Any, job: dict[str, Any]) -> str:
     conversation = str(collection.get("conversationKey") or "")
     if not conversation:
         raise ValueError("FunPay conversation is unavailable")
-    if conversation in state.pending_inputs:
+    idempotency_key = str(job.get("idempotencyKey") or "")
+    if not idempotency_key:
+        raise ValueError("Input request idempotency key is unavailable")
+    timeout = min(840, int(collection.get("timeoutSeconds") or 300))
+    pending = state.pending_inputs.get(conversation)
+    created = pending is None
+    if pending and pending.idempotency_key != idempotency_key:
         raise RuntimeError("Another input request is active in this chat")
-    future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
-    state.pending_inputs[conversation] = future
+    if pending is None:
+        pending = PendingInput(
+            idempotency_key=idempotency_key,
+            future=asyncio.get_running_loop().create_future(),
+            deadline=time.monotonic() + timeout,
+        )
+        state.pending_inputs[conversation] = pending
     try:
         prompt = str(collection.get("prompt") or "")
-        if prompt:
+        if created and prompt:
             await asyncio.to_thread(
                 state.account.send_message,
                 conversation,
                 prompt,
                 add_to_ignore_list=False,
             )
-        return await asyncio.wait_for(
-            future,
-            timeout=min(840, int(collection.get("timeoutSeconds") or 300)),
-        )
+        remaining = max(0.0, pending.deadline - time.monotonic())
+        try:
+            return await asyncio.wait_for(
+                asyncio.shield(pending.future),
+                timeout=remaining,
+            )
+        except TimeoutError:
+            raise TimeoutError("Timed out waiting for a FunPay buyer response") from None
     finally:
-        state.pending_inputs.pop(conversation, None)
+        current = state.pending_inputs.get(conversation)
+        if current is pending and (pending.future.done() or time.monotonic() >= pending.deadline):
+            state.pending_inputs.pop(conversation, None)
