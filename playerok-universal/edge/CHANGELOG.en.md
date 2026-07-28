@@ -1,3 +1,8 @@
+# 1.0.6 Edge
+
+- Purchase events return buyers to the exact Playerok deal; messages return to their deal or the chat list.
+- Added one-time Buywell form support and removed legacy step-by-step buyer input from the current package.
+
 # 1.0.5 Edge
 
 - Interactive Edge setup now reads Russian and English field labels from the Playerok package.

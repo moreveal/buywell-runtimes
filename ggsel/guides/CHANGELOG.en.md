@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.7 — July 28, 2026
+
+- Purchases and messages support one-time Buywell forms that return buyers to the protected GGSel purchases area.
+- The legacy step-by-step buyer input flow was removed from the current package.
+
 ## 1.2.3 — July 22, 2026
 
 - A successful message send is no longer reported as failed when GGSel returns an empty body or plain text instead of JSON.

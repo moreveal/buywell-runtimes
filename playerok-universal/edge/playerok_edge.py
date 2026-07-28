@@ -65,7 +65,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="playerok.universal",
-    version="1.0.5",
+    version="1.0.6",
     display_name={"ru": "Playerok", "en": "Playerok"},
     description={
         "ru": "Продажи и сообщения Playerok без Playerok Universal и Telegram-бота",
@@ -101,7 +101,6 @@ class ConnectionState:
     task: asyncio.Task[None] | None = None
     error: Exception | None = None
     last_success_at: str | None = None
-    pending_inputs: dict[str, asyncio.Future[str]] = field(default_factory=dict)
     catalog_cache: tuple[float, list[Any]] = field(
         default_factory=lambda: (0.0, [])
     )
@@ -217,10 +216,18 @@ def _scope_from_item(item: Any) -> dict[str, Any]:
     )
 
 
+def _event_version(event_type: str) -> str:
+    return "1.1.0" if event_type in {
+        "commerce.purchase.created",
+        "messaging.message.received",
+    } else "1.0.0"
+
+
 def _captured(session: Any, event_type: str) -> bool:
     specification = session.capture_specification
     return bool(specification) and any(
-        item.get("eventType") == event_type and item.get("eventVersion") == "1.0.0"
+        item.get("eventType") == event_type
+        and item.get("eventVersion") == _event_version(event_type)
         for item in specification.get("subscriptions", [])
     )
 
@@ -268,12 +275,13 @@ async def _purchase(session: Any, state: ConnectionState, event: Any) -> None:
             "chatId": _identifier(chat),
             **_scope_from_item(item),
             "buyerId": _identifier(buyer),
+            "returnUrl": f"https://playerok.com/deal/{_identifier(deal)}",
         }
     )
     if _captured(session, "commerce.purchase.created"):
         await session.emit_event(
             "commerce.purchase.created",
-            "1.0.0",
+            "1.1.0",
             payload,
             scope,
             event_id=f"playerok:purchase:{_identifier(deal)}",
@@ -301,10 +309,6 @@ async def _message(session: Any, state: ConnectionState, event: Any) -> None:
     }:
         return
     text = _text(getattr(message, "text", None)) or ""
-    pending = state.pending_inputs.get(chat_id)
-    if pending and not pending.done() and text:
-        pending.set_result(text)
-        return
     deal = getattr(message, "deal", None)
     item = getattr(deal, "item", None) if deal else getattr(message, "item", None)
     if _identifier(item) and (
@@ -339,12 +343,17 @@ async def _message(session: Any, state: ConnectionState, event: Any) -> None:
             "chatId": chat_id,
             **(_scope_from_item(item) if _identifier(item) else {}),
             "buyerId": _identifier(sender),
+            "returnUrl": (
+                f"https://playerok.com/deal/{_identifier(deal)}"
+                if _identifier(deal)
+                else "https://playerok.com/chats"
+            ),
         }
     )
     if _captured(session, "messaging.message.received"):
         await session.emit_event(
             "messaging.message.received",
-            "1.0.0",
+            "1.1.0",
             payload,
             scope,
             event_id=f"playerok:message:{_identifier(message)}",
@@ -557,32 +566,3 @@ async def categories(context: Any, job: dict[str, Any]) -> dict[str, Any]:
             }
         ],
     }
-
-
-@extension.input_resolver("playerok.universal.collect-input", "1.0.0")
-async def collect_input(context: Any, job: dict[str, Any]) -> str:
-    state = _states.get(context.connection_id)
-    if not state or not state.account:
-        raise RuntimeError("Playerok session is unavailable")
-    collection = job.get("collection") or {}
-    conversation = str(collection.get("conversationKey") or "")
-    if not conversation:
-        raise ValueError("Playerok conversation is unavailable")
-    if conversation in state.pending_inputs:
-        raise RuntimeError("Another input request is active in this chat")
-    future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
-    state.pending_inputs[conversation] = future
-    try:
-        prompt = str(collection.get("prompt") or "")
-        if prompt:
-            await asyncio.to_thread(
-                state.account.send_message,
-                chat_id=conversation,
-                text=prompt,
-            )
-        return await asyncio.wait_for(
-            future,
-            timeout=min(840, int(collection.get("timeoutSeconds") or 300)),
-        )
-    finally:
-        state.pending_inputs.pop(conversation, None)

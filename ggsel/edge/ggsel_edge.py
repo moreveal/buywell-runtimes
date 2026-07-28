@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -48,7 +48,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="ggsel.seller",
-    version="1.2.6",
+    version="1.2.7",
     display_name={"ru": "GGSel", "en": "GGSel"},
     description={
         "ru": "Продажи, сообщения и каталог GGSel через Buywell Edge",
@@ -131,7 +131,6 @@ class ConnectionState:
     task: asyncio.Task[None] | None = None
     error: Exception | None = None
     last_success_at: str | None = None
-    pending_inputs: dict[str, asyncio.Future[str]] = field(default_factory=dict)
 
 
 _states: dict[str, ConnectionState] = {}
@@ -211,7 +210,16 @@ def _poll_messages(state: ConnectionState) -> list[tuple[int, int, dict[str, Any
                     "isImage": bool(message.get("is_img")),
                 } if message.get("is_file") else None,
             })
-            result.append((chat_id, message_id, payload, {"chatId": chat_id, "invoiceId": str(chat_id)}))
+            result.append((
+                chat_id,
+                message_id,
+                payload,
+                {
+                    "chatId": chat_id,
+                    "invoiceId": str(chat_id),
+                    "returnUrl": "https://payment.ggsel.net/",
+                },
+            ))
         if parsed:
             state.storage.advance_chat(chat_id, parsed[-1][0])
     state.storage.set_setting("messages_initialized", "1")
@@ -228,19 +236,16 @@ async def _run(session: Any, state: ConnectionState) -> None:
             contacted_provider = False
             if now >= next_sales:
                 for event_type, event_id, payload, scope in await asyncio.to_thread(_poll_sales, state):
-                    if _captured(session, event_type, "1.1.0"):
-                        await session.emit_event(event_type, "1.1.0", payload, scope, event_id=event_id)
+                    if _captured(session, event_type, "1.2.0"):
+                        await session.emit_event(event_type, "1.2.0", payload, scope, event_id=event_id)
                 next_sales = now + state.config.poll_interval_seconds
                 contacted_provider = True
             if now >= next_messages:
                 for chat_id, message_id, payload, scope in await asyncio.to_thread(_poll_messages, state):
-                    pending = state.pending_inputs.get(str(chat_id))
-                    if pending and not pending.done() and payload.get("text"):
-                        pending.set_result(str(payload["text"]))
-                    elif _captured(session, "messaging.message.received", "1.0.0"):
+                    if _captured(session, "messaging.message.received", "1.1.0"):
                         await session.emit_event(
                             "messaging.message.received",
-                            "1.0.0",
+                            "1.1.0",
                             payload,
                             scope,
                             event_id=f"ggsel:{state.config.seller_id}:chat:{chat_id}:message:{message_id}",
@@ -331,26 +336,3 @@ async def send_message(context: Any, value: SendMessageInput) -> dict[str, Any]:
 @extension.binding_catalog("ggsel.products", "1.0.0")
 async def product_catalog(context: Any, job: dict[str, Any]) -> dict[str, Any]:
     return await asyncio.to_thread(_catalog_result, _states[context.connection_id].client, job)
-
-
-@extension.input_resolver("ggsel.seller.collect-input", "1.0.0")
-async def collect_input(context: Any, job: dict[str, Any]) -> str:
-    state = _states[context.connection_id]
-    collection = job.get("collection") or {}
-    conversation = str(collection.get("conversationKey") or "")
-    if not conversation:
-        raise ValueError("GGSel conversation is unavailable")
-    if conversation in state.pending_inputs:
-        raise RuntimeError("Another input request is active in this chat")
-    future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
-    state.pending_inputs[conversation] = future
-    try:
-        prompt = str(collection.get("invalidResponse") if int(job.get("deliveryAttempt") or 1) > 1 else collection.get("prompt") or "")
-        if prompt:
-            await asyncio.to_thread(state.client.send_message, int(conversation), prompt)
-        return await asyncio.wait_for(
-            future,
-            timeout=min(840, int(collection.get("timeoutSeconds") or 300)),
-        )
-    finally:
-        state.pending_inputs.pop(conversation, None)

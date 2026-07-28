@@ -20,10 +20,11 @@ from .state import RuntimeState
 
 
 MODULE_ID = "playerok.universal"
-MODULE_VERSION = "1.0.5"
+MODULE_VERSION = "1.0.6"
 PURCHASE_EVENT = "commerce.purchase.created"
 MESSAGE_EVENT = "messaging.message.received"
-EVENT_VERSION = "1.0.0"
+PURCHASE_EVENT_VERSION = "1.1.0"
+MESSAGE_EVENT_VERSION = "1.1.0"
 CATALOG_ID = "playerok.categories"
 CATALOG_VERSION = "1.0.0"
 CATALOG_PROTOCOL_VERSION = "1.0.0"
@@ -146,7 +147,12 @@ def _captured(
     for subscription in specification.get("subscriptions", []):
         if (
             subscription.get("eventType") != event_type
-            or subscription.get("eventVersion") != EVENT_VERSION
+            or subscription.get("eventVersion")
+            != (
+                PURCHASE_EVENT_VERSION
+                if event_type == PURCHASE_EVENT
+                else MESSAGE_EVENT_VERSION
+            )
         ):
             continue
         conditions = subscription.get("conditions", [])
@@ -579,7 +585,11 @@ class RuntimeBridge:
                 "moduleId": MODULE_ID,
                 "moduleVersion": MODULE_VERSION,
                 "eventType": event_type,
-                "eventVersion": EVENT_VERSION,
+                "eventVersion": (
+                    PURCHASE_EVENT_VERSION
+                    if event_type == PURCHASE_EVENT
+                    else MESSAGE_EVENT_VERSION
+                ),
                 "eventId": event_id,
                 "payload": payload,
                 "scope": scope,
@@ -644,6 +654,7 @@ class RuntimeBridge:
                 "chatId": _identifier(chat),
                 **_scope_from_item(item),
                 "buyerId": _identifier(buyer),
+                "returnUrl": f"https://playerok.com/deal/{deal_id}",
             }
         )
         return self._enqueue(
@@ -720,6 +731,11 @@ class RuntimeBridge:
                 "chatId": _identifier(chat),
                 **(_scope_from_item(item) if _identifier(item) else {}),
                 "buyerId": _identifier(sender),
+                "returnUrl": (
+                    f"https://playerok.com/deal/{_identifier(deal)}"
+                    if _identifier(deal)
+                    else "https://playerok.com/chats"
+                ),
             }
         )
         return self._enqueue(

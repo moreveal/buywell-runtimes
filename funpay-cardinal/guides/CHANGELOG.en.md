@@ -1,5 +1,9 @@
 # FunPay Cardinal changelog
 
+## 1.3.8 — July 28, 2026
+
+- “Buyer form” now collects multiple fields at once and returns the buyer to FunPay; the current package no longer includes message-based input collection.
+
 ## 1.3.0 — July 22, 2026
 
 - Connection setup can now accept a regular FunPay category URL; Cardinal loads its custom order fields and choices directly.

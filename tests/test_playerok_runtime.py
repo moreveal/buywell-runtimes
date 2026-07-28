@@ -53,7 +53,11 @@ def capture(event_type: str, conditions=None):
         "subscriptions": [
             {
                 "eventType": event_type,
-                "eventVersion": "1.0.0",
+                "eventVersion": (
+                    bridge_module.PURCHASE_EVENT_VERSION
+                    if event_type == bridge_module.PURCHASE_EVENT
+                    else bridge_module.MESSAGE_EVENT_VERSION
+                ),
                 "conditions": conditions or [],
             }
         ],
@@ -134,6 +138,10 @@ class PlayerokRuntimeTests(unittest.TestCase):
         self.assertEqual(body["scope"]["itemId"], "item-1")
         self.assertEqual(body["scope"]["categoryId"], "category-1")
         self.assertEqual(body["scope"]["gameId"], "game-1")
+        self.assertEqual(
+            body["scope"]["returnUrl"],
+            "https://playerok.com/deal/deal-1",
+        )
         self.assertEqual(body["payload"]["fieldChoiceIds"]["__item"], "item-1")
         self.assertEqual(
             body["payload"]["fieldChoiceIds"]["__obtaining_type"],
@@ -191,6 +199,7 @@ class PlayerokRuntimeTests(unittest.TestCase):
         self.assertTrue(runtime.handle_message(runtime.bot, Object(message=message, chat=chat)))
         body = runtime.state.outbox()[0][1]
         self.assertNotIn("itemId", body["scope"])
+        self.assertEqual(body["scope"]["returnUrl"], "https://playerok.com/chats")
         self.assertFalse(
             runtime.handle_message(
                 runtime.bot,
@@ -317,7 +326,7 @@ class PlayerokRuntimeTests(unittest.TestCase):
             {
                 "eventId": "playerok:message:one",
                 "eventType": bridge_module.MESSAGE_EVENT,
-                "eventVersion": "1.0.0",
+                "eventVersion": bridge_module.MESSAGE_EVENT_VERSION,
                 "payload": {},
                 "scope": {},
             },

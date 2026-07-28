@@ -44,26 +44,31 @@ class PackageTests(unittest.TestCase):
                 runtime_text,
             )
 
-    def test_ggsel_events_offer_durable_buyer_input_collection(self):
-        manifest = json.loads((ROOT / "ggsel" / "manifest.json").read_text(encoding="utf-8"))
-        for event in manifest["events"]:
-            resolver = next(
-                item
-                for item in event.get("inputResolvers", [])
-                if item["id"] == "ggsel.seller.collect-input"
+    def test_current_modules_do_not_publish_legacy_buyer_input_resolvers(self):
+        for package in ("ggsel", "funpay-cardinal", "playerok-universal"):
+            manifest = json.loads(
+                (ROOT / package / "manifest.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(resolver["mode"], "deferred")
-            self.assertEqual(resolver["abstractionId"], "messaging.collect-input")
-            self.assertEqual(resolver["requiredContext"], [{"source": "scope", "path": "chatId"}])
+            for event in manifest["events"]:
+                self.assertFalse(event.get("inputResolvers"))
+
+    def test_ns_gifts_managed_adapter_cannot_offer_buyer_forms(self):
+        source = (ROOT / "ns-gifts" / "ns_gifts_edge.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("adapter_driver(", source)
+        self.assertIn('extension_id="adapter.ns-gifts"', source)
+        self.assertNotIn("messaging.send-in-context", source)
+        self.assertNotIn("buyerForm", source)
 
     def test_ggsel_1_2_adds_stable_product_catalog(self):
         manifest = json.loads((ROOT / "ggsel" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["module"]["version"], "1.2.6")
+        self.assertEqual(manifest["module"]["version"], "1.2.7")
         self.assertEqual(
             [(event["type"], event["version"]) for event in manifest["events"]],
             [
-                ("commerce.purchase.created", "1.1.0"),
-                ("messaging.message.received", "1.0.0"),
+                ("commerce.purchase.created", "1.2.0"),
+                ("messaging.message.received", "1.1.0"),
             ],
         )
         self.assertEqual(
@@ -74,16 +79,26 @@ class PackageTests(unittest.TestCase):
             manifest["nodes"][0]["inputSchema"]["properties"],
             {"message": {"type": "string"}},
         )
+        for event in manifest["events"]:
+            self.assertEqual(event["buyerForm"]["returnUrl"]["path"], "returnUrl")
+            self.assertEqual(
+                event["buyerForm"]["returnUrl"]["allowedOrigins"],
+                ["https://payment.ggsel.net"],
+            )
 
     def test_funpay_1_3_loads_category_fields_through_cardinal(self):
         manifest = json.loads((ROOT / "funpay-cardinal" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["module"]["version"], "1.3.7")
+        self.assertEqual(manifest["module"]["version"], "1.3.8")
         purchase_events = [event for event in manifest["events"] if event["type"].startswith("commerce.purchase")]
         self.assertTrue(purchase_events)
         for event in purchase_events:
-            self.assertEqual(event["version"], "1.3.0")
+            self.assertEqual(event["version"], "1.4.0")
+            self.assertEqual(event["buyerForm"]["returnUrl"]["path"], "returnUrl")
             self.assertEqual(event["bindingCatalogs"][0]["id"], "funpay.categories")
             self.assertEqual(event["bindingCatalogs"][0]["scope"]["selectorId"], "category-id")
+        message = next(event for event in manifest["events"] if event["type"] == "messaging.message.received")
+        self.assertEqual(message["version"], "1.1.0")
+        self.assertEqual(message["buyerForm"]["returnUrl"]["allowedOrigins"], ["https://funpay.com"])
 
     def test_playerok_1_0_4_offers_human_readable_conditions_and_category_matrix(self):
         manifest = json.loads(
@@ -91,7 +106,7 @@ class PackageTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["module"]["version"], "1.0.5")
+        self.assertEqual(manifest["module"]["version"], "1.0.6")
         events = {event["type"]: event for event in manifest["events"]}
         self.assertEqual(
             [selector["id"] for selector in events["messaging.message.received"]["selectors"][:5]],
@@ -115,6 +130,11 @@ class PackageTests(unittest.TestCase):
             ],
         )
         for event in events.values():
+            self.assertEqual(event["version"], "1.1.0")
+            self.assertEqual(
+                event["buyerForm"]["returnUrl"]["allowedOrigins"],
+                ["https://playerok.com"],
+            )
             catalog = event["bindingCatalogs"][0]
             self.assertEqual(catalog["id"], "playerok.categories")
             self.assertEqual(catalog["scope"]["selectorId"], "category-id")
@@ -137,9 +157,9 @@ class PackageTests(unittest.TestCase):
             )
             with zipfile.ZipFile(first_output) as archive:
                 names = archive.namelist()
-                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.2.6.zip")
+                runtime_archive = archive.read("runtime/ggsel-seller-runtime-1.2.7.zip")
             self.assertIn("manifest.json", names)
-            self.assertIn("runtime/ggsel-seller-runtime-1.2.6.zip", names)
+            self.assertIn("runtime/ggsel-seller-runtime-1.2.7.zip", names)
             self.assertNotIn("runtime/ggsel_runtime.py", names)
             self.assertNotIn("install.bat", names)
             with zipfile.ZipFile(BytesIO(runtime_archive)) as runtime:
@@ -148,7 +168,7 @@ class PackageTests(unittest.TestCase):
                     runtime_names,
                     sorted(build_packages.RUNTIME_BUNDLES["ggsel"]),
                 )
-                self.assertIn(b'MODULE_VERSION = "1.2.6"', runtime.read("ggsel_runtime.py"))
+                self.assertIn(b'MODULE_VERSION = "1.2.7"', runtime.read("ggsel_runtime.py"))
                 self.assertTrue(runtime.getinfo("install.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("install-service.sh").external_attr >> 16 & 0o111)
                 self.assertTrue(runtime.getinfo("run.sh").external_attr >> 16 & 0o111)
@@ -159,7 +179,7 @@ class PackageTests(unittest.TestCase):
             with zipfile.ZipFile(package) as archive:
                 names = archive.namelist()
                 runtime_archive = archive.read(
-                    "runtime/playerok-universal-runtime-1.0.5.zip"
+                    "runtime/playerok-universal-runtime-1.0.6.zip"
                 )
             self.assertIn("assets/playerok-banner.jpg", names)
             self.assertIn("assets/playerok-icon.png", names)
@@ -169,7 +189,7 @@ class PackageTests(unittest.TestCase):
                     sorted(build_packages.RUNTIME_BUNDLES["playerok-universal"]),
                 )
                 self.assertIn(
-                    b'MODULE_VERSION = "1.0.5"',
+                    b'MODULE_VERSION = "1.0.6"',
                     runtime.read("buywell_playerok/bridge.py"),
                 )
                 self.assertIn(

@@ -1,3 +1,7 @@
+# 1.3.8 Edge
+
+- Adds the buyer form with a safe return to the FunPay order or chat. Message-based input collection is completely removed from the current package.
+
 # 1.3.7 Edge
 
 - A buyer message can now be consumed only once even when FunPay delivers it both as a new-message event and a last-chat-message change. A retry no longer exhausts every attempt on the same response.

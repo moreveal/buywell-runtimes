@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "ggsel.seller",
-    "version": "1.2.6",
+    "version": "1.2.7",
     "displayName": "GGSel Seller",
     "description": "Передаёт покупки и сообщения GGSel в сценарии Buywell и отправляет ответы покупателям.",
     "publisher": "Buywell",
@@ -20,8 +20,8 @@
       "icon": "assets/ggsel-square-icon.png"
     },
     "artifact": {
-      "path": "runtime/ggsel-seller-runtime-1.2.6.zip",
-      "filename": "ggsel-seller-runtime-1.2.6.zip"
+      "path": "runtime/ggsel-seller-runtime-1.2.7.zip",
+      "filename": "ggsel-seller-runtime-1.2.7.zip"
     },
     "guides": {
       "installation": {
@@ -50,7 +50,7 @@
   "events": [
     {
       "type": "commerce.purchase.created",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "displayName": "Purchase received",
       "description": "Starts when the runtime finds a new paid GGSel purchase.",
       "localization": {
@@ -162,13 +162,17 @@
           },
           "buyerEmail": {
             "type": "string"
+          },
+          "returnUrl": {
+            "type": "string"
           }
         },
         "required": [
           "invoiceId",
           "chatId",
           "sellerId",
-          "productId"
+          "productId",
+          "returnUrl"
         ],
         "additionalProperties": false
       },
@@ -407,71 +411,15 @@
           "choiceFieldId": "option-choice-id"
         }
       ],
-      "inputResolvers": [
-        {
-          "id": "ggsel.seller.collect-input",
-          "version": "1.0.0",
-          "abstractionId": "messaging.collect-input",
-          "abstractionVersion": "1.1.0",
-          "displayName": "Ask buyer",
-          "description": "Asks the buyer for a value and lets Buywell validate every response.",
-          "localization": {
-            "ru": {
-              "displayName": "Спросить покупателя",
-              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
-            },
-            "en": {
-              "displayName": "Ask buyer",
-              "description": "Asks in the current chat and sends responses to Buywell for validation."
-            }
-          },
-          "outputSchema": {
-            "type": "unknown"
-          },
-          "parameterSchema": {
-            "type": "object",
-            "properties": {
-              "prompt": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "invalidResponse": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "validator": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "timeoutSeconds": {
-                "type": "integer"
-              },
-              "maxInvalidAttempts": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "prompt",
-              "invalidResponse",
-              "validator"
-            ],
-            "additionalProperties": false
-          },
-          "mode": "deferred",
-          "sensitive": true,
-          "requiredContext": [
-            {
-              "source": "scope",
-              "path": "chatId"
-            }
-          ],
-          "ui": {
-            "category": "Messaging",
-            "order": 10,
-            "recommended": true
-          }
+      "buyerForm": {
+        "returnUrl": {
+          "source": "scope",
+          "path": "returnUrl",
+          "allowedOrigins": [
+            "https://payment.ggsel.net"
+          ]
         }
-      ],
+      },
       "identityFields": [
         "invoiceId"
       ],
@@ -482,7 +430,7 @@
     },
     {
       "type": "messaging.message.received",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "displayName": "Message received",
       "description": "Starts when a buyer sends a new GGSel message.",
       "localization": {
@@ -545,11 +493,15 @@
           },
           "invoiceId": {
             "type": "string"
+          },
+          "returnUrl": {
+            "type": "string"
           }
         },
         "required": [
           "chatId",
-          "invoiceId"
+          "invoiceId",
+          "returnUrl"
         ],
         "additionalProperties": false
       },
@@ -642,71 +594,15 @@
           "availability": "when-present"
         }
       ],
-      "inputResolvers": [
-        {
-          "id": "ggsel.seller.collect-input",
-          "version": "1.0.0",
-          "abstractionId": "messaging.collect-input",
-          "abstractionVersion": "1.1.0",
-          "displayName": "Ask buyer",
-          "description": "Asks the buyer for a value and lets Buywell validate every response.",
-          "localization": {
-            "ru": {
-              "displayName": "Спросить покупателя",
-              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
-            },
-            "en": {
-              "displayName": "Ask buyer",
-              "description": "Asks in the current chat and sends responses to Buywell for validation."
-            }
-          },
-          "outputSchema": {
-            "type": "unknown"
-          },
-          "parameterSchema": {
-            "type": "object",
-            "properties": {
-              "prompt": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "invalidResponse": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "validator": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "timeoutSeconds": {
-                "type": "integer"
-              },
-              "maxInvalidAttempts": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "prompt",
-              "invalidResponse",
-              "validator"
-            ],
-            "additionalProperties": false
-          },
-          "mode": "deferred",
-          "sensitive": true,
-          "requiredContext": [
-            {
-              "source": "scope",
-              "path": "chatId"
-            }
-          ],
-          "ui": {
-            "category": "Messaging",
-            "order": 10,
-            "recommended": true
-          }
+      "buyerForm": {
+        "returnUrl": {
+          "source": "scope",
+          "path": "returnUrl",
+          "allowedOrigins": [
+            "https://payment.ggsel.net"
+          ]
         }
-      ],
+      },
       "identityFields": [
         "messageId",
         "chatId"
@@ -761,13 +657,13 @@
       "requiredEventContext": [
         {
           "eventType": "commerce.purchase.created",
-          "eventVersion": "1.1.0",
+          "eventVersion": "1.2.0",
           "source": "scope",
           "path": "chatId"
         },
         {
           "eventType": "messaging.message.received",
-          "eventVersion": "1.0.0",
+          "eventVersion": "1.1.0",
           "source": "scope",
           "path": "chatId"
         }

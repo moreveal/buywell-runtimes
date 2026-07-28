@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6 — 2026-07-28
+
+- Purchases and messages support one-time Buywell forms.
+- The form returns buyers to the exact Playerok deal, or to the chat list when a message has no deal.
+- The legacy step-by-step buyer input flow was removed from the current package.
+
 ## 1.0.4 — 2026-07-23
 
 - Draft items are now available in the catalog and marked as “Draft”, so the matrix can be prepared before an item is published.

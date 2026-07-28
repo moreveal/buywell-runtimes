@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "playerok.universal",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "displayName": "Playerok Universal",
     "description": "Передаёт продажи и сообщения Playerok в сценарии Buywell и отправляет ответы покупателям.",
     "publisher": "Buywell",
@@ -21,8 +21,8 @@
       "icon": "assets/playerok-icon.png"
     },
     "artifact": {
-      "path": "runtime/playerok-universal-runtime-1.0.5.zip",
-      "filename": "playerok-universal-runtime-1.0.5.zip"
+      "path": "runtime/playerok-universal-runtime-1.0.6.zip",
+      "filename": "playerok-universal-runtime-1.0.6.zip"
     },
     "guides": {
       "installation": {
@@ -50,7 +50,7 @@
   "events": [
     {
       "type": "commerce.purchase.created",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "displayName": "Purchase received",
       "description": "Starts when Playerok Universal detects a new paid sale.",
       "localization": {
@@ -166,12 +166,16 @@
           },
           "buyerId": {
             "type": "string"
+          },
+          "returnUrl": {
+            "type": "string"
           }
         },
         "required": [
           "dealId",
           "chatId",
-          "itemId"
+          "itemId",
+          "returnUrl"
         ],
         "additionalProperties": false
       },
@@ -575,6 +579,15 @@
           "choiceFieldId": "field-choice-id"
         }
       ],
+      "buyerForm": {
+        "returnUrl": {
+          "source": "scope",
+          "path": "returnUrl",
+          "allowedOrigins": [
+            "https://playerok.com"
+          ]
+        }
+      },
       "identityFields": [
         "dealId"
       ],
@@ -585,7 +598,7 @@
     },
     {
       "type": "messaging.message.received",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "displayName": "Message received",
       "description": "Starts when a customer sends a message in Playerok.",
       "localization": {
@@ -707,11 +720,15 @@
           },
           "buyerId": {
             "type": "string"
+          },
+          "returnUrl": {
+            "type": "string"
           }
         },
         "required": [
           "messageId",
-          "chatId"
+          "chatId",
+          "returnUrl"
         ],
         "additionalProperties": false
       },
@@ -1098,6 +1115,15 @@
           "choiceFieldId": "field-choice-id"
         }
       ],
+      "buyerForm": {
+        "returnUrl": {
+          "source": "scope",
+          "path": "returnUrl",
+          "allowedOrigins": [
+            "https://playerok.com"
+          ]
+        }
+      },
       "identityFields": [
         "messageId"
       ],
@@ -1151,13 +1177,13 @@
       "requiredEventContext": [
         {
           "eventType": "commerce.purchase.created",
-          "eventVersion": "1.0.0",
+          "eventVersion": "1.1.0",
           "source": "scope",
           "path": "chatId"
         },
         {
           "eventType": "messaging.message.received",
-          "eventVersion": "1.0.0",
+          "eventVersion": "1.1.0",
           "source": "scope",
           "path": "chatId"
         }

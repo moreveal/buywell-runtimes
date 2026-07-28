@@ -1,3 +1,8 @@
+# 1.2.7 Edge
+
+- Purchase and message events provide a safe return to GGSel purchases and support one-time Buywell forms.
+- Removed the legacy step-by-step buyer input implementation from the current package.
+
 # 1.2.6 Edge
 
 - Input retries now send the configured invalid-response message; the Buywell server canonically enforces every response constraint.

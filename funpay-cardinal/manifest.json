@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "funpay.cardinal",
-    "version": "1.3.7",
+    "version": "1.3.8",
     "displayName": "FunPay Cardinal",
     "description": "Получает события FunPay и выполняет действия сценариев Buywell через Cardinal.",
     "publisher": "Buywell",
@@ -45,7 +45,7 @@
   "events": [
     {
       "type": "commerce.purchase.created",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "displayName": "Purchase received",
       "description": "Starts when Cardinal finds a new paid order.",
       "localization": {
@@ -258,6 +258,9 @@
           "orderId": {
             "type": "string"
           },
+          "returnUrl": {
+            "type": "string"
+          },
           "chatId": {
             "type": "unknown"
           },
@@ -279,6 +282,7 @@
         },
         "required": [
           "orderId",
+          "returnUrl",
           "chatId"
         ],
         "additionalProperties": false
@@ -1120,71 +1124,15 @@
           "choiceFieldId": "lot-field"
         }
       ],
-      "inputResolvers": [
-        {
-          "id": "funpay.cardinal.collect-input",
-          "version": "1.0.0",
-          "abstractionId": "messaging.collect-input",
-          "abstractionVersion": "1.1.0",
-          "displayName": "Ask buyer",
-          "description": "Asks the buyer for a value and lets Buywell validate every response.",
-          "localization": {
-            "ru": {
-              "displayName": "Спросить покупателя",
-              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
-            },
-            "en": {
-              "displayName": "Ask buyer",
-              "description": "Asks in the current chat and sends responses to Buywell for validation."
-            }
-          },
-          "outputSchema": {
-            "type": "unknown"
-          },
-          "parameterSchema": {
-            "type": "object",
-            "properties": {
-              "prompt": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "invalidResponse": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "validator": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "timeoutSeconds": {
-                "type": "integer"
-              },
-              "maxInvalidAttempts": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "prompt",
-              "invalidResponse",
-              "validator"
-            ],
-            "additionalProperties": false
-          },
-          "mode": "deferred",
-          "sensitive": true,
-          "requiredContext": [
-            {
-              "source": "scope",
-              "path": "chatId"
-            }
-          ],
-          "ui": {
-            "category": "Messaging",
-            "order": 10,
-            "recommended": true
-          }
+      "buyerForm": {
+        "returnUrl": {
+          "source": "scope",
+          "path": "returnUrl",
+          "allowedOrigins": [
+            "https://funpay.com"
+          ]
         }
-      ],
+      },
       "identityFields": [
         "orderId",
         "status"
@@ -1196,7 +1144,7 @@
     },
     {
       "type": "commerce.purchase.status-changed",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "displayName": "Purchase status changed",
       "localization": {
         "ru": {
@@ -1406,6 +1354,9 @@
           "orderId": {
             "type": "string"
           },
+          "returnUrl": {
+            "type": "string"
+          },
           "chatId": {
             "type": "unknown"
           },
@@ -1427,6 +1378,7 @@
         },
         "required": [
           "orderId",
+          "returnUrl",
           "chatId"
         ],
         "additionalProperties": false
@@ -2287,6 +2239,15 @@
           "choiceFieldId": "lot-field"
         }
       ],
+      "buyerForm": {
+        "returnUrl": {
+          "source": "scope",
+          "path": "returnUrl",
+          "allowedOrigins": [
+            "https://funpay.com"
+          ]
+        }
+      },
       "identityFields": [
         "orderId",
         "status"
@@ -2298,7 +2259,7 @@
     },
     {
       "type": "messaging.message.received",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "displayName": "Message received",
       "localization": {
         "ru": {
@@ -2350,12 +2311,16 @@
           "chatId": {
             "type": "unknown"
           },
+          "returnUrl": {
+            "type": "string"
+          },
           "orderId": {
             "type": "string"
           }
         },
         "required": [
-          "chatId"
+          "chatId",
+          "returnUrl"
         ],
         "additionalProperties": false
       },
@@ -2484,71 +2449,15 @@
           "availability": "when-present"
         }
       ],
-      "inputResolvers": [
-        {
-          "id": "funpay.cardinal.collect-input",
-          "version": "1.0.0",
-          "abstractionId": "messaging.collect-input",
-          "abstractionVersion": "1.1.0",
-          "displayName": "Ask buyer",
-          "description": "Asks the buyer for a value and lets Buywell validate every response.",
-          "localization": {
-            "ru": {
-              "displayName": "Спросить покупателя",
-              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
-            },
-            "en": {
-              "displayName": "Ask buyer",
-              "description": "Asks in the current chat and sends responses to Buywell for validation."
-            }
-          },
-          "outputSchema": {
-            "type": "unknown"
-          },
-          "parameterSchema": {
-            "type": "object",
-            "properties": {
-              "prompt": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "invalidResponse": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "validator": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "timeoutSeconds": {
-                "type": "integer"
-              },
-              "maxInvalidAttempts": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "prompt",
-              "invalidResponse",
-              "validator"
-            ],
-            "additionalProperties": false
-          },
-          "mode": "deferred",
-          "sensitive": true,
-          "requiredContext": [
-            {
-              "source": "scope",
-              "path": "chatId"
-            }
-          ],
-          "ui": {
-            "category": "Messaging",
-            "order": 10,
-            "recommended": true
-          }
+      "buyerForm": {
+        "returnUrl": {
+          "source": "scope",
+          "path": "returnUrl",
+          "allowedOrigins": [
+            "https://funpay.com"
+          ]
         }
-      ],
+      },
       "identityFields": [
         "messageId"
       ],
@@ -2596,19 +2505,19 @@
       "requiredEventContext": [
         {
           "eventType": "commerce.purchase.created",
-          "eventVersion": "1.3.0",
+          "eventVersion": "1.4.0",
           "source": "scope",
           "path": "chatId"
         },
         {
           "eventType": "commerce.purchase.status-changed",
-          "eventVersion": "1.3.0",
+          "eventVersion": "1.4.0",
           "source": "scope",
           "path": "chatId"
         },
         {
           "eventType": "messaging.message.received",
-          "eventVersion": "1.0.0",
+          "eventVersion": "1.1.0",
           "source": "scope",
           "path": "chatId"
         }

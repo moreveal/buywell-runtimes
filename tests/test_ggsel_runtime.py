@@ -310,7 +310,7 @@ class BuywellProtocolTests(unittest.TestCase):
         self.assertEqual(channel.sent[1]["type"], "capture-spec.applied")
         self.assertTrue(channel.closed)
 
-    def test_socket_delivers_event_action_and_durable_input_cycle(self):
+    def test_socket_delivers_event_and_action(self):
         with tempfile.TemporaryDirectory() as temporary:
             state = runtime.State(Path(temporary) / "state.sqlite3")
             state.enqueue(
@@ -332,10 +332,6 @@ class BuywellProtocolTests(unittest.TestCase):
 
                 def send_message(self, chat_id, message):
                     self.messages.append((chat_id, message))
-                    if message == "Question":
-                        state.save_input_candidate("candidate-1", "correlation-1", "bad")
-                    elif message == "Try again":
-                        state.save_input_candidate("candidate-2", "correlation-1", "valid")
 
             client = Client()
 
@@ -387,6 +383,7 @@ class BuywellProtocolTests(unittest.TestCase):
                             }
                         )
                     if self.stage == 4:
+                        runtime.STOP.set()
                         return json.dumps(
                             {
                                 "type": "action.request",
@@ -400,56 +397,6 @@ class BuywellProtocolTests(unittest.TestCase):
                                 },
                             }
                         )
-                    if self.stage == 5:
-                        return json.dumps(
-                            {
-                                "type": "input.request",
-                                "job": {"jobId": "input-1", "leaseToken": "lease-input"},
-                            }
-                        )
-                    if self.stage == 6:
-                        return json.dumps(
-                            {
-                                "type": "input.waiting.accepted",
-                                "accepted": True,
-                                "jobId": "input-1",
-                                "correlationToken": "correlation-1",
-                                "conversationKey": "100",
-                                "deadline": "2026-07-23T00:00:00Z",
-                                "prompt": "Question",
-                            }
-                        )
-                    if self.stage == 7:
-                        self.assert_candidate_sent("candidate-1")
-                        return json.dumps(
-                            {
-                                "type": "input.candidate.result",
-                                "accepted": True,
-                                "correlationToken": "correlation-1",
-                                "candidateId": "candidate-1",
-                                "outcome": "retry",
-                                "message": "Try again",
-                            }
-                        )
-                    self.assert_candidate_sent("candidate-2")
-                    runtime.STOP.set()
-                    return json.dumps(
-                        {
-                            "type": "input.candidate.result",
-                            "accepted": True,
-                            "correlationToken": "correlation-1",
-                            "candidateId": "candidate-2",
-                            "outcome": "resolved",
-                        }
-                    )
-
-                def assert_candidate_sent(self, candidate_id):
-                    assert any(
-                        item.get("type") == "input.candidate"
-                        and item.get("candidateId") == candidate_id
-                        for item in self.sent
-                    )
-
                 def settimeout(self, _timeout):
                     pass
 
@@ -465,15 +412,13 @@ class BuywellProtocolTests(unittest.TestCase):
                 runtime._connect_socket(config(state.path), state, client)
 
             self.assertEqual(state.outbox(), [])
-            self.assertIsNone(state.input_wait_for_conversation("100"))
-            self.assertEqual(state.input_candidates(), [])
             self.assertEqual(
                 client.messages,
-                [(100, "Workflow message"), (100, "Question"), (100, "Try again")],
+                [(100, "Workflow message")],
             )
             self.assertEqual(
-                [item["type"] for item in channel.sent if item["type"] in {"action.result", "input.waiting"}],
-                ["action.result", "input.waiting"],
+                [item["type"] for item in channel.sent if item["type"] == "action.result"],
+                ["action.result"],
             )
             self.assertTrue(channel.closed)
 
@@ -541,46 +486,10 @@ class PollingTests(unittest.TestCase):
             rows = state.outbox()
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0][1]["payload"]["text"], "buyer")
-
-    def test_waiting_buyer_reply_becomes_input_candidate_instead_of_event(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            state = runtime.State(Path(temporary) / "state.sqlite3")
-            state.set_setting("messages_initialized", "1")
-            state.remember_chat(100, emit_existing=True)
-            state.save_input_wait("correlation-1", "100", "2026-07-23T00:00:00Z")
-            client = FakeClient()
-            client.message_rows[100] = [
-                {"id": 2, "message": "buyer reply", "seller": 0, "buyer": 1},
-            ]
-            runtime.Poller(config(state.path), state, client).poll_messages()
-            self.assertEqual(state.outbox(), [])
-            candidates = state.input_candidates()
-            self.assertEqual(len(candidates), 1)
-            self.assertEqual(candidates[0][0], "correlation-1")
-            self.assertEqual(candidates[0][3], "buyer reply")
-
-    def test_replacing_waits_removes_stale_candidates(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            state = runtime.State(Path(temporary) / "state.sqlite3")
-            state.save_input_wait("old", "100", "2026-07-23T00:00:00Z")
-            state.save_input_candidate("candidate-1", "old", "reply")
-            state.replace_input_waits(
-                [{"correlationToken": "new", "conversationKey": "200", "deadline": "2026-07-24T00:00:00Z"}]
+            self.assertEqual(
+                rows[0][1]["scope"]["returnUrl"],
+                "https://payment.ggsel.net/",
             )
-            self.assertIsNone(state.input_wait_for_conversation("100"))
-            self.assertEqual(state.input_wait_for_conversation("200"), "new")
-            self.assertEqual(state.input_candidates(), [])
-
-    def test_wait_and_unsubmitted_reply_survive_state_reopen(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            path = Path(temporary) / "state.sqlite3"
-            state = runtime.State(path)
-            state.save_input_wait("correlation-1", "100", "2026-07-23T00:00:00Z")
-            state.save_input_candidate("candidate-1", "correlation-1", "reply")
-
-            reopened = runtime.State(path)
-            self.assertEqual(reopened.input_wait_for_conversation("100"), "correlation-1")
-            self.assertEqual(reopened.input_candidates()[0][3], "reply")
 
     def test_unacknowledged_event_survives_state_reopen(self):
         with tempfile.TemporaryDirectory() as temporary:
