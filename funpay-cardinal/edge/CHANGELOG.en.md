@@ -1,3 +1,7 @@
+# 1.3.10 Edge
+
+- “Ask the buyer” can collect validated values in the FunPay chat or send one protected Buywell form, selected by the workflow owner.
+
 # 1.3.9 Edge
 
 - Message-based input collection is completely removed from the current package. “Ask the buyer” now uses only the unified form.

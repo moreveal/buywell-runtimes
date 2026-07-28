@@ -3,7 +3,7 @@
   "protocolVersion": "1.0.0",
   "module": {
     "id": "funpay.cardinal",
-    "version": "1.3.9",
+    "version": "1.3.10",
     "displayName": "FunPay Cardinal",
     "description": "Получает события FunPay и выполняет действия сценариев Buywell через Cardinal.",
     "publisher": "Buywell",
@@ -1124,6 +1124,43 @@
           "choiceFieldId": "lot-field"
         }
       ],
+      "inputResolvers": [
+        {
+          "id": "funpay.cardinal.collect-input",
+          "version": "1.0.0",
+          "abstractionId": "messaging.collect-input",
+          "abstractionVersion": "1.1.0",
+          "displayName": "Ask buyer",
+          "description": "Asks the buyer for a value and lets Buywell validate every response.",
+          "localization": {
+            "ru": {
+              "displayName": "Спросить покупателя",
+              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
+            },
+            "en": {
+              "displayName": "Ask buyer",
+              "description": "Asks in the current chat and sends responses to Buywell for validation."
+            }
+          },
+          "outputSchema": { "type": "unknown" },
+          "parameterSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": { "type": "object", "additionalProperties": true },
+              "invalidResponse": { "type": "object", "additionalProperties": true },
+              "validator": { "type": "object", "additionalProperties": true },
+              "timeoutSeconds": { "type": "integer" },
+              "maxInvalidAttempts": { "type": "integer" }
+            },
+            "required": ["prompt", "invalidResponse", "validator"],
+            "additionalProperties": false
+          },
+          "mode": "deferred",
+          "sensitive": true,
+          "requiredContext": [{ "source": "scope", "path": "chatId" }],
+          "ui": { "category": "Messaging", "order": 10, "recommended": true }
+        }
+      ],
       "buyerForm": {
         "returnUrl": {
           "source": "scope",
@@ -2239,6 +2276,43 @@
           "choiceFieldId": "lot-field"
         }
       ],
+      "inputResolvers": [
+        {
+          "id": "funpay.cardinal.collect-input",
+          "version": "1.0.0",
+          "abstractionId": "messaging.collect-input",
+          "abstractionVersion": "1.1.0",
+          "displayName": "Ask buyer",
+          "description": "Asks the buyer for a value and lets Buywell validate every response.",
+          "localization": {
+            "ru": {
+              "displayName": "Спросить покупателя",
+              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
+            },
+            "en": {
+              "displayName": "Ask buyer",
+              "description": "Asks in the current chat and sends responses to Buywell for validation."
+            }
+          },
+          "outputSchema": { "type": "unknown" },
+          "parameterSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": { "type": "object", "additionalProperties": true },
+              "invalidResponse": { "type": "object", "additionalProperties": true },
+              "validator": { "type": "object", "additionalProperties": true },
+              "timeoutSeconds": { "type": "integer" },
+              "maxInvalidAttempts": { "type": "integer" }
+            },
+            "required": ["prompt", "invalidResponse", "validator"],
+            "additionalProperties": false
+          },
+          "mode": "deferred",
+          "sensitive": true,
+          "requiredContext": [{ "source": "scope", "path": "chatId" }],
+          "ui": { "category": "Messaging", "order": 10, "recommended": true }
+        }
+      ],
       "buyerForm": {
         "returnUrl": {
           "source": "scope",
@@ -2447,6 +2521,43 @@
             "type": "string"
           },
           "availability": "when-present"
+        }
+      ],
+      "inputResolvers": [
+        {
+          "id": "funpay.cardinal.collect-input",
+          "version": "1.0.0",
+          "abstractionId": "messaging.collect-input",
+          "abstractionVersion": "1.1.0",
+          "displayName": "Ask buyer",
+          "description": "Asks the buyer for a value and lets Buywell validate every response.",
+          "localization": {
+            "ru": {
+              "displayName": "Спросить покупателя",
+              "description": "Задаёт вопрос в текущем чате и передаёт ответы на проверку Buywell."
+            },
+            "en": {
+              "displayName": "Ask buyer",
+              "description": "Asks in the current chat and sends responses to Buywell for validation."
+            }
+          },
+          "outputSchema": { "type": "unknown" },
+          "parameterSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": { "type": "object", "additionalProperties": true },
+              "invalidResponse": { "type": "object", "additionalProperties": true },
+              "validator": { "type": "object", "additionalProperties": true },
+              "timeoutSeconds": { "type": "integer" },
+              "maxInvalidAttempts": { "type": "integer" }
+            },
+            "required": ["prompt", "invalidResponse", "validator"],
+            "additionalProperties": false
+          },
+          "mode": "deferred",
+          "sensitive": true,
+          "requiredContext": [{ "source": "scope", "path": "chatId" }],
+          "ui": { "category": "Messaging", "order": 10, "recommended": true }
         }
       ],
       "buyerForm": {

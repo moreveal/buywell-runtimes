@@ -1,5 +1,9 @@
 # FunPay Cardinal changelog
 
+## 1.3.10 — July 28, 2026
+
+- “Ask the buyer” supports both validated chat questions and the protected multi-field form. The workflow owner chooses one mode for the whole request.
+
 ## 1.3.9 — July 28, 2026
 
 - The current package no longer contains message-based input collection: “Ask the buyer” always opens the unified form.

@@ -44,13 +44,24 @@ class PackageTests(unittest.TestCase):
                 runtime_text,
             )
 
-    def test_current_modules_do_not_publish_legacy_buyer_input_resolvers(self):
-        for package in ("ggsel", "funpay-cardinal", "playerok-universal"):
+    def test_current_marketplace_buyer_input_capabilities_are_explicit(self):
+        for package in ("ggsel", "playerok-universal"):
             manifest = json.loads(
                 (ROOT / package / "manifest.json").read_text(encoding="utf-8")
             )
             for event in manifest["events"]:
+                self.assertTrue(event.get("buyerForm"))
                 self.assertFalse(event.get("inputResolvers"))
+
+        funpay = json.loads(
+            (ROOT / "funpay-cardinal" / "manifest.json").read_text(encoding="utf-8")
+        )
+        for event in funpay["events"]:
+            self.assertTrue(event.get("buyerForm"))
+            resolvers = event.get("inputResolvers") or []
+            self.assertEqual(len(resolvers), 1)
+            self.assertEqual(resolvers[0]["abstractionId"], "messaging.collect-input")
+            self.assertEqual(resolvers[0]["abstractionVersion"], "1.1.0")
 
     def test_ns_gifts_managed_adapter_cannot_offer_buyer_forms(self):
         source = (ROOT / "ns-gifts" / "ns_gifts_edge.py").read_text(
@@ -88,7 +99,7 @@ class PackageTests(unittest.TestCase):
 
     def test_funpay_1_3_loads_category_fields_through_cardinal(self):
         manifest = json.loads((ROOT / "funpay-cardinal" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["module"]["version"], "1.3.9")
+        self.assertEqual(manifest["module"]["version"], "1.3.10")
         purchase_events = [event for event in manifest["events"] if event["type"].startswith("commerce.purchase")]
         self.assertTrue(purchase_events)
         for event in purchase_events:
@@ -96,9 +107,11 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(event["buyerForm"]["returnUrl"]["path"], "returnUrl")
             self.assertEqual(event["bindingCatalogs"][0]["id"], "funpay.categories")
             self.assertEqual(event["bindingCatalogs"][0]["scope"]["selectorId"], "category-id")
+            self.assertEqual(event["inputResolvers"][0]["id"], "funpay.cardinal.collect-input")
         message = next(event for event in manifest["events"] if event["type"] == "messaging.message.received")
         self.assertEqual(message["version"], "1.1.0")
         self.assertEqual(message["buyerForm"]["returnUrl"]["allowedOrigins"], ["https://funpay.com"])
+        self.assertEqual(message["inputResolvers"][0]["id"], "funpay.cardinal.collect-input")
 
     def test_playerok_1_0_4_offers_human_readable_conditions_and_category_matrix(self):
         manifest = json.loads(

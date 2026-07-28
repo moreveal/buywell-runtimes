@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from cardinal import Cardinal
 
 NAME = "Buywell"
-VERSION = "1.3.9"
+VERSION = "1.3.10"
 PURCHASE_EVENT_VERSION = "1.4.0"
 MESSAGE_EVENT_VERSION = "1.1.0"
 DESCRIPTION = "Связывает FunPay Cardinal с вашими сценариями Buywell."
@@ -176,6 +176,17 @@ def _connect() -> sqlite3.Connection:
     database.execute(
         "CREATE TABLE IF NOT EXISTS capture_specification (singleton INTEGER PRIMARY KEY CHECK(singleton=1), value TEXT NOT NULL)"
     )
+    database.execute("CREATE TABLE IF NOT EXISTS input_waits (correlation_token TEXT PRIMARY KEY, conversation_key TEXT UNIQUE NOT NULL, deadline TEXT NOT NULL)")
+    database.execute("CREATE TABLE IF NOT EXISTS input_candidates (candidate_id TEXT PRIMARY KEY, correlation_token TEXT NOT NULL, observed_at TEXT NOT NULL DEFAULT '', value TEXT NOT NULL)")
+    columns = {row[1] for row in database.execute("PRAGMA table_info(input_candidates)")}
+    if "candidate_id" not in columns: database.execute("ALTER TABLE input_candidates ADD COLUMN candidate_id TEXT NOT NULL DEFAULT ''")
+    if "observed_at" not in columns: database.execute("ALTER TABLE input_candidates ADD COLUMN observed_at TEXT NOT NULL DEFAULT ''")
+    primary = next((row[1] for row in database.execute("PRAGMA table_info(input_candidates)") if row[5]), None)
+    if primary == "correlation_token":
+        database.execute("ALTER TABLE input_candidates RENAME TO input_candidates_legacy")
+        database.execute("CREATE TABLE input_candidates (candidate_id TEXT PRIMARY KEY, correlation_token TEXT NOT NULL, observed_at TEXT NOT NULL DEFAULT '', value TEXT NOT NULL)")
+        database.execute("INSERT OR IGNORE INTO input_candidates(candidate_id,correlation_token,observed_at,value) SELECT candidate_id,correlation_token,observed_at,value FROM input_candidates_legacy WHERE candidate_id<>''")
+        database.execute("DROP TABLE input_candidates_legacy")
     database.commit()
     return database
 
@@ -500,7 +511,7 @@ def _worker(cardinal: "Cardinal") -> None:
                 if ready.get("type") == "capture-spec.applied.accepted" and not ready.get("accepted"): raise RuntimeError("capture_specification_rejected")
                 if ready.get("type") == "expected-events.replace": applyExpectedEvents(ready["specification"])
                 ready = json.loads(channel.recv())
-            channel.settimeout(1); retry = 1; heartbeat_at = 0.0; pending_batch: tuple[str, list[tuple[int, str]]] | None = None
+            channel.settimeout(1); retry = 1; heartbeat_at = 0.0; pending_batch: tuple[str, list[tuple[int, str]]] | None = None; pending_input_jobs: dict[str, dict[str, Any]] = {}; submitted_candidates: set[str] = set()
             while not STOP.is_set():
                 now = time.time()
                 if now >= heartbeat_at:
@@ -520,6 +531,11 @@ def _worker(cardinal: "Cardinal") -> None:
                         batch_id = str(uuid.uuid4()); pending_batch = (batch_id, identities)
                         with CAPTURE_LOCK: capture_revision = int(CAPTURE_SPEC.get("revision", 0))
                         channel.send(json.dumps({"type": "event.batch", "batchId": batch_id, "captureSpecRevision": capture_revision, "events": events}, ensure_ascii=False))
+                with _connect() as database:
+                    candidates = database.execute("SELECT correlation_token,candidate_id,observed_at,value FROM input_candidates ORDER BY rowid").fetchall()
+                for correlation_token, candidate_id, observed_at, value in candidates:
+                    if candidate_id not in submitted_candidates:
+                        channel.send(json.dumps({"type": "input.candidate", "correlationToken": correlation_token, "candidateId": candidate_id, "observedAt": observed_at, "value": value}, ensure_ascii=False)); submitted_candidates.add(candidate_id)
                 try: message = json.loads(channel.recv())
                 except websocket_client.WebSocketTimeoutException: continue
                 if message.get("type") == "event.batch.accepted" and pending_batch and message.get("batchId") == pending_batch[0]:
@@ -539,6 +555,32 @@ def _worker(cardinal: "Cardinal") -> None:
                 elif message.get("type") == "catalog.request":
                     job=message["job"]
                     channel.send(json.dumps({"type":"catalog.result","jobId":job["jobId"],"leaseToken":job["leaseToken"],"result":_catalog_job(cardinal,job)},ensure_ascii=False))
+                elif message.get("type") == "input.request":
+                    job = message["job"]; pending_input_jobs[job["jobId"]] = job
+                    channel.send(json.dumps({"type": "input.waiting", "jobId": job["jobId"], "leaseToken": job["leaseToken"]}))
+                elif message.get("type") == "input.waiting.accepted" and message.get("accepted"):
+                    job = pending_input_jobs.pop(str(message.get("jobId")), None)
+                    if job:
+                        with _connect() as database:
+                            database.execute("INSERT INTO input_waits(correlation_token,conversation_key,deadline) VALUES(?,?,?) ON CONFLICT(conversation_key) DO UPDATE SET correlation_token=excluded.correlation_token,deadline=excluded.deadline", (message["correlationToken"], message["conversationKey"], message["deadline"]))
+                        if message.get("prompt"):
+                            cardinal.send_message(message["conversationKey"], message["prompt"], watermark=False)
+                elif message.get("type") == "input.waits.replace":
+                    with _connect() as database:
+                        database.execute("DELETE FROM input_waits")
+                        for wait in message.get("waiting", []): database.execute("INSERT INTO input_waits(correlation_token,conversation_key,deadline) VALUES(?,?,?)", (wait["correlationToken"], wait["conversationKey"], wait["deadline"]))
+                        database.execute("DELETE FROM input_candidates WHERE correlation_token NOT IN (SELECT correlation_token FROM input_waits)")
+                elif message.get("type") == "input.candidate.result":
+                    correlation_token = str(message.get("correlationToken", "")); candidate_id = str(message.get("candidateId", "")); submitted_candidates.discard(candidate_id)
+                    if message.get("outcome") == "retry":
+                        with _connect() as database: database.execute("DELETE FROM input_candidates WHERE candidate_id=?", (candidate_id,))
+                        with _connect() as database: row = database.execute("SELECT conversation_key FROM input_waits WHERE correlation_token=?", (correlation_token,)).fetchone()
+                        if row and message.get("message"): cardinal.send_message(row[0], message["message"], watermark=False)
+                    elif message.get("outcome") in ("resolved", "failed"):
+                        with _connect() as database:
+                            database.execute("DELETE FROM input_candidates WHERE correlation_token=?", (correlation_token,)); database.execute("DELETE FROM input_waits WHERE correlation_token=?", (correlation_token,))
+                    elif not message.get("accepted"):
+                        with _connect() as database: database.execute("DELETE FROM input_candidates WHERE candidate_id=?", (candidate_id,))
                 elif message.get("type") == "capture-spec.replace":
                     specification = message["specification"]
                     _apply_capture_specification(specification)
@@ -709,6 +751,27 @@ def _handle_message_event(cardinal: "Cardinal", event: NewMessageEvent | LastCha
     text = str(message).strip()
     if not text:
         return
+    conversation_keys = [str(getattr(message, "chat_id", ""))]
+    author_id = getattr(message, "author_id", None)
+    account_id = getattr(cardinal.account, "id", None)
+    if author_id not in (None, 0) and account_id not in (None, 0):
+        participant_key = "users-" + "-".join(str(value) for value in sorted((int(author_id), int(account_id))))
+        if participant_key not in conversation_keys:
+            conversation_keys.append(participant_key)
+    with _connect() as database:
+        wait = None
+        for conversation_key in conversation_keys:
+            wait = database.execute("SELECT correlation_token FROM input_waits WHERE conversation_key=?", (conversation_key,)).fetchone()
+            if wait:
+                break
+        if wait:
+            message_id = getattr(message, "id", None)
+            if message_id is None:
+                _diagnostic("input response has no stable platform message id: chat_id=%s", message.chat_id)
+                return
+            candidate_id = f"funpay:{cardinal.account.id}:{message.chat_id}:{message_id}"
+            database.execute("INSERT OR IGNORE INTO input_candidates(candidate_id,correlation_token,observed_at,value) VALUES(?,?,?,?)", (candidate_id, wait[0], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), text))
+            return
     payload = {
         "messageId": getattr(message, "id", 0),
         "chatId": message.chat_id,

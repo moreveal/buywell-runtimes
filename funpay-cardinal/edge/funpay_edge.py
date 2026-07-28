@@ -56,7 +56,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.9",
+    version="1.3.10",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
@@ -85,6 +85,13 @@ extension = module(
 
 
 @dataclass
+class PendingInput:
+    idempotency_key: str
+    future: asyncio.Future[str]
+    deadline: float
+
+
+@dataclass
 class ConnectionState:
     account: Account | None = None
     runner: Runner | None = None
@@ -94,12 +101,15 @@ class ConnectionState:
     last_success_at: str | None = None
     last_success_monotonic: float | None = None
     poll_interval_seconds: float = 6
+    pending_inputs: dict[str, PendingInput] = field(default_factory=dict)
+    recent_messages: dict[str, list[tuple[int, float, str]]] = field(default_factory=dict)
     seen_message_ids: dict[int, float] = field(default_factory=dict)
 
 
 _states: dict[str, ConnectionState] = {}
 
 _RECENT_MESSAGE_TTL_SECONDS = 600.0
+_RECENT_MESSAGE_LIMIT = 50
 
 
 def _accept_message_once(state: ConnectionState, message_id: int) -> bool:
@@ -116,6 +126,34 @@ def _accept_message_once(state: ConnectionState, message_id: int) -> bool:
         return False
     state.seen_message_ids[message_id] = now
     return True
+
+
+def _remember_message(state: ConnectionState, conversation: str, message_id: int, text: str) -> None:
+    now = time.monotonic()
+    cutoff = now - _RECENT_MESSAGE_TTL_SECONDS
+    messages = [
+        item
+        for item in state.recent_messages.get(conversation, [])
+        if item[1] >= cutoff and item[0] != message_id
+    ]
+    messages.append((message_id, now, text))
+    state.recent_messages[conversation] = messages[-_RECENT_MESSAGE_LIMIT:]
+
+
+def _pop_recent_message(state: ConnectionState, conversation: str) -> str | None:
+    now = time.monotonic()
+    cutoff = now - _RECENT_MESSAGE_TTL_SECONDS
+    messages = [
+        item
+        for item in state.recent_messages.get(conversation, [])
+        if item[1] >= cutoff
+    ]
+    if not messages:
+        state.recent_messages.pop(conversation, None)
+        return None
+    _message_id, _observed_at, text = messages.pop(0)
+    state.recent_messages[conversation] = messages
+    return text
 
 
 def _mark_success(state: ConnectionState) -> None:
@@ -353,6 +391,21 @@ async def _emit_event(session: Any, state: ConnectionState, event: Any) -> None:
     message_id = int(getattr(message, "id", 0) or 0)
     if not _accept_message_once(state, message_id):
         return
+    conversation_keys = [str(message.chat_id)]
+    author_id = getattr(message, "author_id", None)
+    if author_id not in (None, 0) and account.id not in (None, 0):
+        participant_key = "users-" + "-".join(
+            str(value) for value in sorted((int(author_id), int(account.id)))
+        )
+        if participant_key not in conversation_keys:
+            conversation_keys.append(participant_key)
+    for conversation in conversation_keys:
+        pending = state.pending_inputs.get(conversation)
+        if pending and not pending.future.done():
+            pending.future.set_result(text)
+            return
+    for conversation in conversation_keys:
+        _remember_message(state, conversation, message_id, text)
     if not _captured(session, "messaging.message.received", "1.1.0"):
         return
     await session.emit_event(
@@ -609,3 +662,59 @@ async def category_catalog(context: Any, job: dict[str, Any]) -> dict[str, Any]:
             ],
         }
     raise ValueError("Unsupported FunPay catalog operation")
+
+
+@extension.input_resolver("funpay.cardinal.collect-input", "1.0.0")
+async def collect_input(context: Any, job: dict[str, Any]) -> str:
+    state = _states.get(context.connection_id)
+    if not state or not state.account:
+        raise RuntimeError("FunPay session is unavailable")
+    collection = job.get("collection") or {}
+    conversation = str(collection.get("conversationKey") or "")
+    if not conversation:
+        raise ValueError("FunPay conversation is unavailable")
+    idempotency_key = str(job.get("idempotencyKey") or "")
+    if not idempotency_key:
+        raise ValueError("Input request idempotency key is unavailable")
+    timeout = min(840, int(collection.get("timeoutSeconds") or 300))
+    pending = state.pending_inputs.get(conversation)
+    created = pending is None
+    if pending and pending.idempotency_key != idempotency_key:
+        raise RuntimeError("Another input request is active in this chat")
+    recent = _pop_recent_message(state, conversation) if pending is None else None
+    if recent is not None:
+        return recent
+    if pending is None:
+        pending = PendingInput(
+            idempotency_key=idempotency_key,
+            future=asyncio.get_running_loop().create_future(),
+            deadline=time.monotonic() + timeout,
+        )
+        state.pending_inputs[conversation] = pending
+    try:
+        prompt = str(
+            collection.get("invalidResponse")
+            if int(job.get("deliveryAttempt") or 1) > 1
+            else collection.get("prompt") or ""
+        )
+        if created and prompt:
+            await asyncio.to_thread(
+                state.account.send_message,
+                conversation,
+                prompt,
+                add_to_ignore_list=False,
+            )
+        remaining = max(0.0, pending.deadline - time.monotonic())
+        try:
+            return await asyncio.wait_for(
+                asyncio.shield(pending.future),
+                timeout=remaining,
+            )
+        except TimeoutError:
+            raise TimeoutError("Timed out waiting for a FunPay buyer response") from None
+    finally:
+        current = state.pending_inputs.get(conversation)
+        if current is pending and (
+            pending.future.done() or time.monotonic() >= pending.deadline
+        ):
+            state.pending_inputs.pop(conversation, None)
