@@ -88,7 +88,7 @@ class PackageTests(unittest.TestCase):
 
     def test_funpay_1_3_loads_category_fields_through_cardinal(self):
         manifest = json.loads((ROOT / "funpay-cardinal" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["module"]["version"], "1.3.8")
+        self.assertEqual(manifest["module"]["version"], "1.3.9")
         purchase_events = [event for event in manifest["events"] if event["type"].startswith("commerce.purchase")]
         self.assertTrue(purchase_events)
         for event in purchase_events:

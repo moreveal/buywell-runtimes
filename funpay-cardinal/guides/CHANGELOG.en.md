@@ -1,8 +1,12 @@
 # FunPay Cardinal changelog
 
+## 1.3.9 — July 28, 2026
+
+- The current package no longer contains message-based input collection: “Ask the buyer” always opens the unified form.
+
 ## 1.3.8 — July 28, 2026
 
-- “Buyer form” now collects multiple fields at once and returns the buyer to FunPay; the current package no longer includes message-based input collection.
+- “Buyer form” now collects multiple fields at once and returns the buyer to FunPay.
 
 ## 1.3.0 — July 22, 2026
 

@@ -1,6 +1,10 @@
+# 1.3.9 Edge
+
+- Message-based input collection is completely removed from the current package. “Ask the buyer” now uses only the unified form.
+
 # 1.3.8 Edge
 
-- Adds the buyer form with a safe return to the FunPay order or chat. Message-based input collection is completely removed from the current package.
+- Adds the buyer form with a safe return to the FunPay order or chat.
 
 # 1.3.7 Edge
 

@@ -56,7 +56,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.8",
+    version="1.3.9",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
