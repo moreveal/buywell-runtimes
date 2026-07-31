@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -197,8 +198,9 @@ class FunPayInputResolverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(buffered[0][0], 123)
         self.assertEqual(buffered[0][2], "https://discord.gg/example")
 
-    async def test_recent_message_resolves_later_input_without_prompt(self) -> None:
+    async def test_message_before_sequence_is_ignored_and_prompt_is_sent(self) -> None:
         sent: list[tuple[str, str]] = []
+        sequence_started_at = datetime.now(UTC)
         state = module.ConnectionState(
             account=SimpleNamespace(
                 id=10385604,
@@ -206,21 +208,57 @@ class FunPayInputResolverTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        class Message:
-            by_bot = False
-            author_id = 20724137
-            type = module.MessageTypes.NON_SYSTEM
-            chat_id = 276588969
-            id = 123
-            author = "buyer"
+        conversation = "users-10385604-20724137"
+        state.recent_messages[conversation] = [
+            (123, sequence_started_at - timedelta(seconds=1), "покупаю"),
+        ]
 
-            def __str__(self) -> str:
-                return "https://discord.gg/example"
+        module._states["connection"] = state
+        try:
+            task = asyncio.create_task(
+                module.collect_input(
+                    SimpleNamespace(connection_id="connection"),
+                    {
+                        "idempotencyKey": "execution:url",
+                        "collection": {
+                            "conversationKey": conversation,
+                            "prompt": "Send URL",
+                            "sequenceStartedAt": sequence_started_at.isoformat(),
+                            "timeoutSeconds": 60,
+                        },
+                    },
+                )
+            )
+            await asyncio.sleep(0)
+            pending = state.pending_inputs[conversation]
+            self.assertFalse(pending.future.done())
+            pending.future.set_result("https://discord.gg/example")
+            result = await task
+        finally:
+            module._states.clear()
 
-        await module._emit_event(
-            SimpleNamespace(capture_specification=None),
-            state,
-            module.NewMessageEvent("test", Message()),
+        self.assertEqual(result, "https://discord.gg/example")
+        self.assertEqual(sent, [(conversation, "Send URL")])
+        self.assertNotIn(conversation, state.recent_messages)
+
+    async def test_message_after_sequence_is_consumed_only_after_prompt(self) -> None:
+        sent: list[tuple[str, str]] = []
+        sequence_started_at = datetime.now(UTC)
+        conversation = "users-10385604-20724137"
+        state = module.ConnectionState(
+            account=SimpleNamespace(
+                id=10385604,
+                send_message=lambda target, prompt, **_: sent.append((target, prompt)) or True,
+            ),
+            recent_messages={
+                conversation: [
+                    (
+                        123,
+                        sequence_started_at + timedelta(milliseconds=1),
+                        "https://discord.gg/example",
+                    )
+                ]
+            },
         )
 
         module._states["connection"] = state
@@ -230,8 +268,9 @@ class FunPayInputResolverTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "idempotencyKey": "execution:url",
                     "collection": {
-                        "conversationKey": "users-10385604-20724137",
+                        "conversationKey": conversation,
                         "prompt": "Send URL",
+                        "sequenceStartedAt": sequence_started_at.isoformat(),
                         "timeoutSeconds": 60,
                     },
                 },
@@ -240,7 +279,7 @@ class FunPayInputResolverTests(unittest.IsolatedAsyncioTestCase):
             module._states.clear()
 
         self.assertEqual(result, "https://discord.gg/example")
-        self.assertEqual(sent, [])
+        self.assertEqual(sent, [(conversation, "Send URL")])
 
     async def test_participant_conversation_key_resolves_input(self) -> None:
         state = module.ConnectionState(account=SimpleNamespace(id=10385604))

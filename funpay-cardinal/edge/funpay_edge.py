@@ -10,7 +10,7 @@ import threading
 import time
 import urllib.parse
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -56,7 +56,7 @@ class SendMessageInput(BaseModel):
 
 extension = module(
     extension_id="funpay.cardinal",
-    version="1.3.10",
+    version="1.3.11",
     display_name={"ru": "FunPay", "en": "FunPay"},
     description={
         "ru": "Продажи и сообщения FunPay без отдельного Telegram-бота",
@@ -102,7 +102,7 @@ class ConnectionState:
     last_success_monotonic: float | None = None
     poll_interval_seconds: float = 6
     pending_inputs: dict[str, PendingInput] = field(default_factory=dict)
-    recent_messages: dict[str, list[tuple[int, float, str]]] = field(default_factory=dict)
+    recent_messages: dict[str, list[tuple[int, datetime, str]]] = field(default_factory=dict)
     seen_message_ids: dict[int, float] = field(default_factory=dict)
 
 
@@ -129,8 +129,8 @@ def _accept_message_once(state: ConnectionState, message_id: int) -> bool:
 
 
 def _remember_message(state: ConnectionState, conversation: str, message_id: int, text: str) -> None:
-    now = time.monotonic()
-    cutoff = now - _RECENT_MESSAGE_TTL_SECONDS
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(seconds=_RECENT_MESSAGE_TTL_SECONDS)
     messages = [
         item
         for item in state.recent_messages.get(conversation, [])
@@ -140,9 +140,15 @@ def _remember_message(state: ConnectionState, conversation: str, message_id: int
     state.recent_messages[conversation] = messages[-_RECENT_MESSAGE_LIMIT:]
 
 
-def _pop_recent_message(state: ConnectionState, conversation: str) -> str | None:
-    now = time.monotonic()
-    cutoff = now - _RECENT_MESSAGE_TTL_SECONDS
+def _pop_recent_message(
+    state: ConnectionState,
+    conversation: str,
+    not_before: datetime,
+) -> str | None:
+    cutoff = max(
+        datetime.now(UTC) - timedelta(seconds=_RECENT_MESSAGE_TTL_SECONDS),
+        not_before,
+    )
     messages = [
         item
         for item in state.recent_messages.get(conversation, [])
@@ -154,6 +160,17 @@ def _pop_recent_message(state: ConnectionState, conversation: str) -> str | None
     _message_id, _observed_at, text = messages.pop(0)
     state.recent_messages[conversation] = messages
     return text
+
+
+def _sequence_started_at(collection: dict[str, Any]) -> datetime:
+    value = collection.get("sequenceStartedAt")
+    if not isinstance(value, str):
+        return datetime.now(UTC)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.now(UTC)
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
 def _mark_success(state: ConnectionState) -> None:
@@ -681,9 +698,6 @@ async def collect_input(context: Any, job: dict[str, Any]) -> str:
     created = pending is None
     if pending and pending.idempotency_key != idempotency_key:
         raise RuntimeError("Another input request is active in this chat")
-    recent = _pop_recent_message(state, conversation) if pending is None else None
-    if recent is not None:
-        return recent
     if pending is None:
         pending = PendingInput(
             idempotency_key=idempotency_key,
@@ -704,6 +718,14 @@ async def collect_input(context: Any, job: dict[str, Any]) -> str:
                 prompt,
                 add_to_ignore_list=False,
             )
+        if created:
+            recent = _pop_recent_message(
+                state,
+                conversation,
+                _sequence_started_at(collection),
+            )
+            if recent is not None:
+                pending.future.set_result(recent)
         remaining = max(0.0, pending.deadline - time.monotonic())
         try:
             return await asyncio.wait_for(

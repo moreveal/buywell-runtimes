@@ -1,3 +1,7 @@
+# 1.3.11 Edge
+
+- “Ask the buyer” now always sends its initial question once. Messages observed before the purchase run are not accepted as answers, while newer buffered messages are checked only after the question is sent.
+
 # 1.3.10 Edge
 
 - “Ask the buyer” can collect validated values in the FunPay chat or send one protected Buywell form, selected by the workflow owner.

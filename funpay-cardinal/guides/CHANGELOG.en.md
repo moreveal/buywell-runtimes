@@ -1,5 +1,9 @@
 # FunPay Cardinal changelog
 
+## 1.3.11 — July 31, 2026
+
+- The buyer question is now always sent once. Messages observed before the purchase run are not accepted as answers, and newer replies are checked only after the question appears in chat.
+
 ## 1.3.10 — July 28, 2026
 
 - “Ask the buyer” supports both validated chat questions and the protected multi-field form. The workflow owner chooses one mode for the whole request.
